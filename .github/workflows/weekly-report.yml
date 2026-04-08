@@ -38,5 +38,9 @@ jobs:
           pip install -e .[dev]
       - name: Initialize database
         run: film-agent init-db
-      - name: Run weekly workflow
+      - name: Run weekly workflow on schedule
+        if: github.event_name == 'schedule'
         run: python scripts/run_if_toronto_9.py
+      - name: Run weekly workflow manually as dry run
+        if: github.event_name == 'workflow_dispatch'
+        run: film-agent run-weekly --dry-run
