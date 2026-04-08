@@ -31,9 +31,11 @@ class NotionSyncService:
 
     def sync_films(self, limit: int = 25) -> None:
         if not self.films_database_id:
+            logger.info("Notion film sync skipped: no films database id configured")
             return
         database = self.client.databases.retrieve(database_id=self.films_database_id)
         properties = database.get("properties", {})
+        logger.info("Notion film database properties: %s", list(properties.keys()))
         title_property = next((name for name, meta in properties.items() if meta.get("type") == "title"), None)
         status_property = "Status" if "Status" in properties else None
         confidence_property = "Confidence" if "Confidence" in properties else None
@@ -42,6 +44,7 @@ class NotionSyncService:
         budget_property = "BudgetRange" if "BudgetRange" in properties else None
         source_url_property = "SourceURL" if "SourceURL" in properties else None
         if not title_property:
+            logger.info("Notion film sync skipped: no title property found on database %s", self.films_database_id)
             return
         with db_session() as session:
             films = list(session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit)))
