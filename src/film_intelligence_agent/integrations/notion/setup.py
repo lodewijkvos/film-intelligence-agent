@@ -87,7 +87,7 @@ class NotionSetupService:
                 continue
             if parent.get("page_id") != self.settings.notion_parent_page_id:
                 continue
-            titles = result.get("title", [])
+            titles = result.get("title", []) or result.get("name", [])
             title = "".join(part.get("plain_text", "") for part in titles).strip()
             if title == expected_title:
                 return result["id"]
