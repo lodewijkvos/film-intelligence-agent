@@ -16,6 +16,8 @@ class FilmPersistenceService:
         persisted: list[Film] = []
         with db_session() as session:
             for item in films:
+                if len(item.title) > 300:
+                    continue
                 normalized = normalize_title(item.title)
                 existing = session.scalar(select(Film).where(Film.normalized_title == normalized))
                 opportunity_score, breakdown = compute_opportunity(item)
