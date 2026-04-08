@@ -188,3 +188,11 @@ class IngestionRun(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     run_metadata: Mapped[dict | None] = mapped_column(JSON)
     error_summary: Mapped[str | None] = mapped_column(Text)
+
+
+class AppConfig(Base):
+    __tablename__ = "app_config"
+
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

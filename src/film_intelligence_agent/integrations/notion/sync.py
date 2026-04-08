@@ -6,14 +6,24 @@ from film_intelligence_agent.config.settings import get_settings
 from film_intelligence_agent.db.models import Film, WeeklyReport
 from film_intelligence_agent.db.session import db_session
 from film_intelligence_agent.integrations.notion.client import get_notion_client
+from film_intelligence_agent.services.config_store import ConfigStore
 
 
 class NotionSyncService:
     def __init__(self, films_database_id: str | None = None, people_database_id: str | None = None) -> None:
         self.settings = get_settings()
         self.client = get_notion_client()
-        self.films_database_id = films_database_id or self.settings.notion_films_database_id
-        self.people_database_id = people_database_id or self.settings.notion_people_database_id
+        store = ConfigStore()
+        self.films_database_id = (
+            films_database_id
+            or self.settings.notion_films_database_id
+            or store.get("notion_films_database_id")
+        )
+        self.people_database_id = (
+            people_database_id
+            or self.settings.notion_people_database_id
+            or store.get("notion_people_database_id")
+        )
 
     def sync_films(self, limit: int = 25) -> None:
         if not self.films_database_id:
