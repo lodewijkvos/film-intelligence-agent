@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     @property
     def effective_database_url(self) -> str:
         if self.database_url:
+            if self.database_url.startswith("postgresql://"):
+                return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
             return self.database_url
         if not self.supabase_url or not self.supabase_db_password:
             raise ValueError("Configure DATABASE_URL or SUPABASE_URL + SUPABASE_DB_PASSWORD.")
