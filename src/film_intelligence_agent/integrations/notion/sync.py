@@ -9,18 +9,20 @@ from film_intelligence_agent.integrations.notion.client import get_notion_client
 
 
 class NotionSyncService:
-    def __init__(self) -> None:
+    def __init__(self, films_database_id: str | None = None, people_database_id: str | None = None) -> None:
         self.settings = get_settings()
         self.client = get_notion_client()
+        self.films_database_id = films_database_id or self.settings.notion_films_database_id
+        self.people_database_id = people_database_id or self.settings.notion_people_database_id
 
     def sync_films(self, limit: int = 25) -> None:
-        if not self.settings.notion_films_database_id:
+        if not self.films_database_id:
             return
         with db_session() as session:
             films = list(session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit)))
         for film in films:
             self.client.pages.create(
-                parent={"database_id": self.settings.notion_films_database_id},
+                parent={"database_id": self.films_database_id},
                 properties={
                     "Title": {"title": [{"text": {"content": film.title}}]},
                     "Status": {"rich_text": [{"text": {"content": film.status or "Unknown"}}]},

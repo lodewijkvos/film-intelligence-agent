@@ -12,8 +12,10 @@ class NotionSetupService:
     def ensure_databases(self) -> dict[str, str]:
         if not self.settings.notion_parent_page_id:
             raise ValueError("NOTION_PARENT_PAGE_ID is missing.")
-        created: dict[str, str] = {}
-        if not self.settings.notion_films_database_id:
+        resolved: dict[str, str] = {}
+        if self.settings.notion_films_database_id:
+            resolved["films_database_id"] = self.settings.notion_films_database_id
+        else:
             response = self.client.databases.create(
                 parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
                 title=[{"type": "text", "text": {"content": "Film Opportunities"}}],
@@ -27,8 +29,10 @@ class NotionSetupService:
                     "SourceURL": {"url": {}},
                 },
             )
-            created["films_database_id"] = response["id"]
-        if not self.settings.notion_people_database_id:
+            resolved["films_database_id"] = response["id"]
+        if self.settings.notion_people_database_id:
+            resolved["people_database_id"] = self.settings.notion_people_database_id
+        else:
             response = self.client.databases.create(
                 parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
                 title=[{"type": "text", "text": {"content": "People Collaborators"}}],
@@ -40,5 +44,5 @@ class NotionSetupService:
                     "SharedProjectCount": {"number": {}},
                 },
             )
-            created["people_database_id"] = response["id"]
-        return created
+            resolved["people_database_id"] = response["id"]
+        return resolved
