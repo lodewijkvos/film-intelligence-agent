@@ -58,7 +58,7 @@ class NotionSetupService:
     def _find_child_database(self, expected_title: str) -> str | None:
         response = self.client.search(
             query=expected_title,
-            filter={"value": "database", "property": "object"},
+            filter={"value": "data_source", "property": "object"},
         )
         for result in response.get("results", []):
             parent = result.get("parent", {})
