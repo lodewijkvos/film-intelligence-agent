@@ -16,33 +16,58 @@ class NotionSetupService:
         if self.settings.notion_films_database_id:
             resolved["films_database_id"] = self.settings.notion_films_database_id
         else:
-            response = self.client.databases.create(
-                parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
-                title=[{"type": "text", "text": {"content": "Film Opportunities"}}],
-                properties={
-                    "Title": {"title": {}},
-                    "Status": {"rich_text": {}},
-                    "Confidence": {"number": {}},
-                    "Opportunity": {"number": {}},
-                    "Country": {"rich_text": {}},
-                    "BudgetRange": {"rich_text": {}},
-                    "SourceURL": {"url": {}},
-                },
-            )
-            resolved["films_database_id"] = response["id"]
+            existing = self._find_child_database("Film Opportunities")
+            if existing:
+                resolved["films_database_id"] = existing
+            else:
+                response = self.client.databases.create(
+                    parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
+                    title=[{"type": "text", "text": {"content": "Film Opportunities"}}],
+                    properties={
+                        "Title": {"title": {}},
+                        "Status": {"rich_text": {}},
+                        "Confidence": {"number": {}},
+                        "Opportunity": {"number": {}},
+                        "Country": {"rich_text": {}},
+                        "BudgetRange": {"rich_text": {}},
+                        "SourceURL": {"url": {}},
+                    },
+                )
+                resolved["films_database_id"] = response["id"]
         if self.settings.notion_people_database_id:
             resolved["people_database_id"] = self.settings.notion_people_database_id
         else:
-            response = self.client.databases.create(
-                parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
-                title=[{"type": "text", "text": {"content": "People Collaborators"}}],
-                properties={
-                    "Name": {"title": {}},
-                    "IMDbURL": {"url": {}},
-                    "KnownCollaborator": {"checkbox": {}},
-                    "SharedProjects": {"rich_text": {}},
-                    "SharedProjectCount": {"number": {}},
-                },
-            )
-            resolved["people_database_id"] = response["id"]
+            existing = self._find_child_database("People Collaborators")
+            if existing:
+                resolved["people_database_id"] = existing
+            else:
+                response = self.client.databases.create(
+                    parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
+                    title=[{"type": "text", "text": {"content": "People Collaborators"}}],
+                    properties={
+                        "Name": {"title": {}},
+                        "IMDbURL": {"url": {}},
+                        "KnownCollaborator": {"checkbox": {}},
+                        "SharedProjects": {"rich_text": {}},
+                        "SharedProjectCount": {"number": {}},
+                    },
+                )
+                resolved["people_database_id"] = response["id"]
         return resolved
+
+    def _find_child_database(self, expected_title: str) -> str | None:
+        response = self.client.search(
+            query=expected_title,
+            filter={"value": "database", "property": "object"},
+        )
+        for result in response.get("results", []):
+            parent = result.get("parent", {})
+            if parent.get("type") != "page_id":
+                continue
+            if parent.get("page_id") != self.settings.notion_parent_page_id:
+                continue
+            titles = result.get("title", [])
+            title = "".join(part.get("plain_text", "") for part in titles).strip()
+            if title == expected_title:
+                return result["id"]
+        return None

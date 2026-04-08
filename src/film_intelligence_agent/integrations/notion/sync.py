@@ -32,6 +32,16 @@ class NotionSyncService:
         with db_session() as session:
             films = list(session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit)))
         for film in films:
+            existing = self.client.databases.query(
+                database_id=self.films_database_id,
+                filter={
+                    "property": title_property,
+                    "title": {"equals": film.title[:200]},
+                },
+                page_size=1,
+            )
+            if existing.get("results"):
+                continue
             notion_properties = {
                 title_property: {"title": [{"text": {"content": film.title[:200]}}]},
             }
