@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from sqlalchemy import desc, select
 
@@ -108,6 +109,20 @@ class NotionSyncService:
             synced_count,
             len(films),
         )
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary_path:
+            with open(summary_path, "a", encoding="utf-8") as handle:
+                handle.write(
+                    "\n".join(
+                        [
+                            "## Notion Sync",
+                            f"- Films database id: `{self.films_database_id}`",
+                            f"- Synced film rows this run: `{synced_count}`",
+                            f"- Candidate film rows considered: `{len(films)}`",
+                            "",
+                        ]
+                    )
+                )
 
     def create_report_page(self, report_id: str) -> str | None:
         if not self.settings.notion_parent_page_id:
