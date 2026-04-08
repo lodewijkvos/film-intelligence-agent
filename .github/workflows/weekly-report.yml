@@ -1,0 +1,41 @@
+name: Weekly Film Intelligence Report
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 13 * * 1"
+    - cron: "0 14 * * 1"
+
+jobs:
+  weekly-report:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      DEFAULT_TIMEZONE: America/Toronto
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      NOTION_PARENT_PAGE_ID: ${{ secrets.NOTION_PARENT_PAGE_ID }}
+      NOTION_FILMS_DATABASE_ID: ${{ secrets.NOTION_FILMS_DATABASE_ID }}
+      NOTION_PEOPLE_DATABASE_ID: ${{ secrets.NOTION_PEOPLE_DATABASE_ID }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      IMDB_PRO_USERNAME: ${{ secrets.IMDB_PRO_USERNAME }}
+      IMDB_PRO_PASSWORD: ${{ secrets.IMDB_PRO_PASSWORD }}
+      IMDB_PUBLIC_URL: ${{ secrets.IMDB_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Initialize schema
+        run: film-intel initdb
+      - name: Run weekly workflow
+        run: python scripts/run_if_toronto_9.py
