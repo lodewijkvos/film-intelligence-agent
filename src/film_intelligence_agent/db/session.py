@@ -15,7 +15,11 @@ _session_factory: sessionmaker | None = None
 def get_engine() -> Engine:
     global _engine
     if _engine is None:
-        _engine = create_engine(get_settings().effective_database_url, pool_pre_ping=True)
+        _engine = create_engine(
+            get_settings().effective_database_url,
+            pool_pre_ping=True,
+            connect_args={"prepare_threshold": None},
+        )
     return _engine
 
 
