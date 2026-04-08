@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+import logging
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from film_intelligence_agent.config.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class CachedFetcher:
@@ -19,7 +22,10 @@ class CachedFetcher:
     def fetch_text(self, source_name: str, url: str) -> tuple[str, str]:
         response = httpx.get(
             url,
-            headers={"User-Agent": "Codex Film Discovery Agent/1.0"},
+            headers={
+                "User-Agent": "Codex Film Discovery Agent/1.0",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
             timeout=30.0,
             follow_redirects=True,
         )
