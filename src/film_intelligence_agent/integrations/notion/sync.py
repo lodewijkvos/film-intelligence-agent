@@ -18,20 +18,44 @@ class NotionSyncService:
     def sync_films(self, limit: int = 25) -> None:
         if not self.films_database_id:
             return
+        database = self.client.databases.retrieve(database_id=self.films_database_id)
+        properties = database.get("properties", {})
+        title_property = next((name for name, meta in properties.items() if meta.get("type") == "title"), None)
+        status_property = "Status" if "Status" in properties else None
+        confidence_property = "Confidence" if "Confidence" in properties else None
+        opportunity_property = "Opportunity" if "Opportunity" in properties else None
+        country_property = "Country" if "Country" in properties else None
+        budget_property = "BudgetRange" if "BudgetRange" in properties else None
+        source_url_property = "SourceURL" if "SourceURL" in properties else None
+        if not title_property:
+            return
         with db_session() as session:
             films = list(session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit)))
         for film in films:
+            notion_properties = {
+                title_property: {"title": [{"text": {"content": film.title[:200]}}]},
+            }
+            if status_property:
+                notion_properties[status_property] = {
+                    "rich_text": [{"text": {"content": (film.status or "Unknown")[:200]}}]
+                }
+            if confidence_property:
+                notion_properties[confidence_property] = {"number": film.data_confidence_score}
+            if opportunity_property:
+                notion_properties[opportunity_property] = {"number": film.opportunity_score}
+            if country_property:
+                notion_properties[country_property] = {
+                    "rich_text": [{"text": {"content": (film.country or "Unknown")[:200]}}]
+                }
+            if budget_property:
+                notion_properties[budget_property] = {
+                    "rich_text": [{"text": {"content": (film.budget_text or "Unknown")[:200]}}]
+                }
+            if source_url_property:
+                notion_properties[source_url_property] = {"url": film.source_url}
             self.client.pages.create(
                 parent={"database_id": self.films_database_id},
-                properties={
-                    "Title": {"title": [{"text": {"content": film.title}}]},
-                    "Status": {"rich_text": [{"text": {"content": film.status or "Unknown"}}]},
-                    "Confidence": {"number": film.data_confidence_score},
-                    "Opportunity": {"number": film.opportunity_score},
-                    "Country": {"rich_text": [{"text": {"content": film.country or "Unknown"}}]},
-                    "BudgetRange": {"rich_text": [{"text": {"content": film.budget_text or "Unknown"}}]},
-                    "SourceURL": {"url": film.source_url},
-                },
+                properties=notion_properties,
             )
 
     def create_report_page(self, report_id: str) -> str | None:
