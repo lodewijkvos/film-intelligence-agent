@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import desc, select
 
 from film_intelligence_agent.config.settings import get_settings
@@ -7,6 +9,8 @@ from film_intelligence_agent.db.models import Film, WeeklyReport
 from film_intelligence_agent.db.session import db_session
 from film_intelligence_agent.integrations.notion.client import get_notion_client
 from film_intelligence_agent.services.config_store import ConfigStore
+
+logger = logging.getLogger(__name__)
 
 
 class NotionSyncService:
@@ -41,6 +45,7 @@ class NotionSyncService:
             return
         with db_session() as session:
             films = list(session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit)))
+        synced_count = 0
         for film in films:
             existing = self.client.databases.query(
                 database_id=self.films_database_id,
@@ -77,6 +82,13 @@ class NotionSyncService:
                 parent={"database_id": self.films_database_id},
                 properties=notion_properties,
             )
+            synced_count += 1
+        logger.info(
+            "Notion film sync complete: database_id=%s synced_count=%s candidate_count=%s",
+            self.films_database_id,
+            synced_count,
+            len(films),
+        )
 
     def create_report_page(self, report_id: str) -> str | None:
         if not self.settings.notion_parent_page_id:

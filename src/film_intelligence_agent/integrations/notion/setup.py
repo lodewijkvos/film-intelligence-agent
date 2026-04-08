@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from film_intelligence_agent.config.settings import get_settings
 from film_intelligence_agent.integrations.notion.client import get_notion_client
 from film_intelligence_agent.services.config_store import ConfigStore
+
+logger = logging.getLogger(__name__)
 
 
 class NotionSetupService:
@@ -65,6 +69,11 @@ class NotionSetupService:
             self.config_store.set("notion_films_database_id", resolved["films_database_id"])
         if "people_database_id" in resolved:
             self.config_store.set("notion_people_database_id", resolved["people_database_id"])
+        logger.info(
+            "Notion database ids resolved: films=%s people=%s",
+            resolved.get("films_database_id"),
+            resolved.get("people_database_id"),
+        )
         return resolved
 
     def _find_child_database(self, expected_title: str) -> str | None:
