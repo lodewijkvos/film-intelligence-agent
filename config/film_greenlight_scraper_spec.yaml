@@ -1,0 +1,51 @@
+version: "1.0"
+agent_name: "film-greenlight-discovery"
+mode: "canada_first"
+
+source_tiers:
+  tier_0_canada_official:
+    weight: 100
+    sources:
+      - name: "Telefilm Canada - Funded Projects Directory"
+        source_type: "canada_official_funder"
+        parser_type: "html_directory"
+        url: "https://telefilm.ca/en/who-we-are/directories/funded-projects-directory"
+      - name: "Ontario Creates - IP Fund Linear Content"
+        source_type: "canada_official_funder"
+        parser_type: "program_page_plus_news"
+        url: "https://www.ontariocreates.ca/investment-programs/content-creation/intellectual-property-fund/linear-content-stream"
+      - name: "Canada Media Fund - Funded Projects"
+        source_type: "canada_official_funder"
+        parser_type: "searchable_database"
+        url: "https://cmf-fmc.ca/funded-projects/"
+      - name: "National Film Board of Canada"
+        source_type: "canada_official_funder"
+        parser_type: "news_release"
+        url: "https://www.canada.ca/en/national-film-board/news.html"
+  tier_1_canada_provincial_activity:
+    weight: 90
+    sources:
+      - name: "Creative BC - In Production"
+        source_type: "canada_public_production_list"
+        parser_type: "html_list"
+        url: "https://creativebc.com/bc-film-commission/in-production/"
+  tier_2_canada_trade:
+    weight: 75
+    sources:
+      - name: "Playback Online"
+        source_type: "canada_trade"
+        parser_type: "article_feed"
+        url: "https://playbackonline.ca/"
+
+fetch_policy:
+  user_agent: "Codex Film Discovery Agent/1.0"
+  respect_robots_txt: true
+  throttle_seconds:
+    default: 3
+    trade_sites: 5
+    government_sites: 2
+  retries: 3
+  timeout_seconds: 30
+  store_raw_html: true
+  store_raw_text: true
+  store_source_snapshot_hash: true
