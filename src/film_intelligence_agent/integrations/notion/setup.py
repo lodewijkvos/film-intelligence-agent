@@ -21,50 +21,30 @@ class NotionSetupService:
         resolved: dict[str, str] = {}
         stored_films_id = self.config_store.get("notion_films_database_id")
         stored_people_id = self.config_store.get("notion_people_database_id")
-        if self.settings.notion_films_database_id:
-            resolved["films_database_id"] = self.settings.notion_films_database_id
-        elif stored_films_id:
-            resolved["films_database_id"] = stored_films_id
-        else:
-            existing = self._find_child_database("Film Opportunities")
-            if existing:
-                resolved["films_database_id"] = existing
-            else:
-                response = self.client.databases.create(
-                    parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
-                    title=[{"type": "text", "text": {"content": "Film Opportunities"}}],
-                    properties={
-                        "Title": {"title": {}},
-                        "Status": {"rich_text": {}},
-                        "Confidence": {"number": {}},
-                        "Opportunity": {"number": {}},
-                        "Country": {"rich_text": {}},
-                        "BudgetRange": {"rich_text": {}},
-                        "SourceURL": {"url": {}},
-                    },
-                )
-                resolved["films_database_id"] = response["id"]
-        if self.settings.notion_people_database_id:
-            resolved["people_database_id"] = self.settings.notion_people_database_id
-        elif stored_people_id:
-            resolved["people_database_id"] = stored_people_id
-        else:
-            existing = self._find_child_database("People Collaborators")
-            if existing:
-                resolved["people_database_id"] = existing
-            else:
-                response = self.client.databases.create(
-                    parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
-                    title=[{"type": "text", "text": {"content": "People Collaborators"}}],
-                    properties={
-                        "Name": {"title": {}},
-                        "IMDbURL": {"url": {}},
-                        "KnownCollaborator": {"checkbox": {}},
-                        "SharedProjects": {"rich_text": {}},
-                        "SharedProjectCount": {"number": {}},
-                    },
-                )
-                resolved["people_database_id"] = response["id"]
+        resolved["films_database_id"] = self._ensure_database(
+            preferred_id=self.settings.notion_films_database_id or stored_films_id,
+            title="Film Opportunities",
+            properties={
+                "Title": {"title": {}},
+                "Status": {"rich_text": {}},
+                "Confidence": {"number": {}},
+                "Opportunity": {"number": {}},
+                "Country": {"rich_text": {}},
+                "BudgetRange": {"rich_text": {}},
+                "SourceURL": {"url": {}},
+            },
+        )
+        resolved["people_database_id"] = self._ensure_database(
+            preferred_id=self.settings.notion_people_database_id or stored_people_id,
+            title="People Collaborators",
+            properties={
+                "Name": {"title": {}},
+                "IMDbURL": {"url": {}},
+                "KnownCollaborator": {"checkbox": {}},
+                "SharedProjects": {"rich_text": {}},
+                "SharedProjectCount": {"number": {}},
+            },
+        )
         if "films_database_id" in resolved:
             self.config_store.set("notion_films_database_id", resolved["films_database_id"])
         if "people_database_id" in resolved:
@@ -76,19 +56,24 @@ class NotionSetupService:
         )
         return resolved
 
-    def _find_child_database(self, expected_title: str) -> str | None:
-        response = self.client.search(
-            query=expected_title,
-            filter={"value": "data_source", "property": "object"},
+    def _ensure_database(self, preferred_id: str | None, title: str, properties: dict) -> str:
+        if preferred_id and self._is_valid_database(preferred_id):
+            return preferred_id
+        if preferred_id:
+            logger.warning("Stored Notion database id %s for %s is invalid; creating a fresh database", preferred_id, title)
+        response = self.client.databases.create(
+            parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
+            title=[{"type": "text", "text": {"content": title}}],
+            properties=properties,
         )
-        for result in response.get("results", []):
-            parent = result.get("parent", {})
-            if parent.get("type") != "page_id":
-                continue
-            if parent.get("page_id") != self.settings.notion_parent_page_id:
-                continue
-            titles = result.get("title", []) or result.get("name", [])
-            title = "".join(part.get("plain_text", "") for part in titles).strip()
-            if title == expected_title:
-                return result["id"]
-        return None
+        return response["id"]
+
+    def _is_valid_database(self, database_id: str) -> bool:
+        try:
+            database = self.client.databases.retrieve(database_id=database_id)
+        except Exception:
+            return False
+        properties = database.get("properties", {}) or {}
+        if not isinstance(properties, dict) or not properties:
+            return False
+        return any(meta.get("type") == "title" for meta in properties.values())

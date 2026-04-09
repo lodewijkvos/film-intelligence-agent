@@ -34,14 +34,8 @@ class NotionSyncService:
         if not self.films_database_id:
             logger.info("Notion film sync skipped: no films database id configured")
             return
-        try:
-            database = self.client.data_sources.retrieve(data_source_id=self.films_database_id)
-            properties = database.get("properties", {})
-            query_fn = "data_sources"
-        except Exception:
-            database = self.client.databases.retrieve(database_id=self.films_database_id)
-            properties = database.get("properties", {})
-            query_fn = "databases"
+        database = self.client.databases.retrieve(database_id=self.films_database_id)
+        properties = database.get("properties", {}) or {}
         logger.info("Notion film database properties: %s", list(properties.keys()))
         title_property = next((name for name, meta in properties.items() if meta.get("type") == "title"), None)
         status_property = "Status" if "Status" in properties else None
@@ -57,24 +51,14 @@ class NotionSyncService:
             films = list(session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit)))
         synced_count = 0
         for film in films:
-            if query_fn == "data_sources":
-                existing = self.client.data_sources.query(
-                    data_source_id=self.films_database_id,
-                    filter={
-                        "property": title_property,
-                        "title": {"equals": film.title[:200]},
-                    },
-                    page_size=1,
-                )
-            else:
-                existing = self.client.databases.query(
-                    database_id=self.films_database_id,
-                    filter={
-                        "property": title_property,
-                        "title": {"equals": film.title[:200]},
-                    },
-                    page_size=1,
-                )
+            existing = self.client.databases.query(
+                database_id=self.films_database_id,
+                filter={
+                    "property": title_property,
+                    "title": {"equals": film.title[:200]},
+                },
+                page_size=1,
+            )
             if existing.get("results"):
                 continue
             notion_properties = {
