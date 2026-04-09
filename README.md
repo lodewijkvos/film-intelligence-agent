@@ -8,7 +8,7 @@ This system is designed to:
 
 - run every Monday at 9:00 a.m. America/Toronto
 - ingest Lo's collaborator graph from IMDb first
-- discover and score film opportunities with Canada-first priority
+- discover and score film and series opportunities with Canada-first priority
 - keep canonical state in PostgreSQL/Supabase
 - sync selected records and weekly reports to Notion
 - send a structured weekly report email

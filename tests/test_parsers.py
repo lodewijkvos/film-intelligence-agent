@@ -50,6 +50,7 @@ def test_cmf_parser_requires_title_and_funding_signal() -> None:
     films = CMFParser().parse(html, SOURCE_META)
     assert [film.title for film in films] == ["The Silent Shore"]
     assert films[0].production_company == "North Shore Films"
+    assert films[0].project_type == "feature_film"
 
 
 def test_cmf_parser_skips_games_and_interactive_projects() -> None:
@@ -67,6 +68,27 @@ def test_cmf_parser_skips_games_and_interactive_projects() -> None:
     </html>
     """
     assert CMFParser().parse(html, SOURCE_META) == []
+
+
+def test_cmf_parser_accepts_series_projects() -> None:
+    html = """
+    <html>
+      <body>
+        <p>Search for funded projects</p>
+        <p>Export Results (XLSX)</p>
+        <p>North Shore Production Bright Harbor Media</p>
+        <p>Fiscal Year</p><p>2025 - 2026</p>
+        <p>Content Type</p><p>Drama Series</p>
+        <p>Commitment</p><p>$900000.00</p>
+        <p>Activity</p><p>Production</p>
+        <p>Region</p><p>Vancouver</p>
+        <p>Program</p><p>Broadcaster Envelope</p>
+      </body>
+    </html>
+    """
+    films = CMFParser().parse(html, SOURCE_META)
+    assert [film.title for film in films] == ["North Shore"]
+    assert films[0].project_type == "series"
 
 
 def test_creative_bc_parser_skips_rows_without_metadata() -> None:

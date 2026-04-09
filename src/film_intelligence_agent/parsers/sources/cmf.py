@@ -28,6 +28,13 @@ KNOWN_FIELD_LABELS = {
 ALLOWED_CONTENT_TYPE_FRAGMENTS = (
     "feature",
     "documentary",
+    "series",
+    "television",
+    "tv",
+    "episodic",
+    "drama",
+    "comedy",
+    "animation",
 )
 
 ALLOWED_PROGRAM_FRAGMENTS = (
@@ -109,6 +116,7 @@ class CMFParser(SourceParser):
                     status="funded",
                     confidence_score=90,
                     date_detected=datetime.utcnow(),
+                    project_type=self._infer_project_type(content_type),
                     country="Canada",
                     region="Canada",
                     province_or_state=fields.get("Region"),
@@ -135,3 +143,15 @@ class CMFParser(SourceParser):
         if any(fragment in lowered_content_type for fragment in ALLOWED_CONTENT_TYPE_FRAGMENTS):
             return True
         return any(fragment in lowered_program for fragment in ALLOWED_PROGRAM_FRAGMENTS)
+
+    def _infer_project_type(self, content_type: str) -> str | None:
+        lowered = content_type.lower()
+        if any(fragment in lowered for fragment in ("series", "television", "tv", "episodic")):
+            return "series"
+        if "documentary" in lowered:
+            return "documentary_feature" if "feature" in lowered else "documentary_series"
+        if "animation" in lowered and any(fragment in lowered for fragment in ("series", "television", "tv", "episodic")):
+            return "animated_series"
+        if any(fragment in lowered for fragment in ("feature", "film")):
+            return "feature_film"
+        return None
