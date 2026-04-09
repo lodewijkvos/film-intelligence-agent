@@ -115,12 +115,15 @@ class NotionSyncService:
         archived_ids: set[str] = set()
 
         def archive_from_query(method: str, identifier_key: str, identifier_value: str) -> None:
+            endpoint = getattr(self.client, method, None)
+            if endpoint is None or not hasattr(endpoint, "query"):
+                return
             next_cursor: str | None = None
             while True:
                 payload = {identifier_key: identifier_value, "page_size": 100}
                 if next_cursor:
                     payload["start_cursor"] = next_cursor
-                response = getattr(self.client, method).query(**payload)
+                response = endpoint.query(**payload)
                 results = response.get("results", [])
                 for page in results:
                     page_id = page["id"]
