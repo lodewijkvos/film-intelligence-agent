@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from film_intelligence_agent.domain.types import ExtractedFilm
 from film_intelligence_agent.parsers.base import SourceParser
-from film_intelligence_agent.parsers.sources.common import clean_candidate_title, extract_title_from_container, has_project_signal
+from film_intelligence_agent.parsers.sources.common import clean_candidate_title, has_project_signal
 from film_intelligence_agent.utils.quality import is_probable_project_title
 
 
@@ -47,7 +47,7 @@ class NFBNewsParser(SourceParser):
         items: list[ExtractedFilm] = []
         seen_titles: set[str] = set()
         for article in soup.select(".gw-gopf-col-wrap, .gw-gopf-post, article, li, .news, .gc-nws"):
-            headline = extract_title_from_container(article, (".gw-gopf-post-title h2 a", "h1", "h2", "h3", "a"))
+            headline = self._extract_headline(article)
             if not headline:
                 continue
             context_text = article.get_text(" ", strip=True)
@@ -78,6 +78,16 @@ class NFBNewsParser(SourceParser):
                     )
                 )
         return items
+
+    def _extract_headline(self, article: BeautifulSoup) -> str | None:
+        for selector in (".gw-gopf-post-title h2 a", "h1", "h2", "h3", "a"):
+            node = article.select_one(selector)
+            if not node:
+                continue
+            candidate = clean_candidate_title(node.get_text(" ", strip=True))
+            if candidate:
+                return candidate
+        return None
 
     def _extract_project_titles(self, headline: str, context_text: str, item_url: str) -> list[str]:
         candidates: list[str] = []

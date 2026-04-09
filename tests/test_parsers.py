@@ -179,3 +179,22 @@ def test_nfb_news_parser_rejects_narrative_fragments_from_descriptor_text() -> N
     titles = [film.title for film in films]
     assert "Saigon Story" in titles
     assert "from Oscar-nominated director" not in titles
+
+
+def test_nfb_news_parser_uses_raw_headline_even_when_headline_is_not_itself_a_title() -> None:
+    html = """
+    <html>
+      <body>
+        <div class="gw-gopf-col-wrap">
+          <div class="gw-gopf-post-title">
+            <h2><a href="https://mediaspace.nfb.ca/comm/nfb-at-doxa-2026/">Kim Nguyen’s Saigon Story and Min Sook Lee’s There Are No Words premiere at DOXA. Two NFB feature documentaries explore intergenerational mysteries.</a></h2>
+          </div>
+          <div class="gw-gopf-post-excerpt">April 2, 2026 – Vancouver – National Film Board of Canada (NFB) Kim Nguyen’s Noble Films/National Film Board of Canada co-production and Min Sook Lee’s documentary are part of the festival lineup.</div>
+        </div>
+      </body>
+    </html>
+    """
+    films = NFBNewsParser().parse(html, SOURCE_META)
+    titles = [film.title for film in films]
+    assert "Saigon Story" in titles
+    assert "There Are No Words" in titles
