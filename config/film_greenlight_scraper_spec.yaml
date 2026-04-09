@@ -21,7 +21,7 @@ source_tiers:
       - name: "National Film Board of Canada"
         source_type: "canada_official_funder"
         parser_type: "news_release"
-        url: "https://www.canada.ca/en/national-film-board/news.html"
+        url: "https://mediaspace.nfb.ca/press-releases/"
   tier_1_canada_provincial_activity:
     weight: 90
     sources:
@@ -35,7 +35,7 @@ source_tiers:
       - name: "Playback Online"
         source_type: "canada_trade"
         parser_type: "article_feed"
-        url: "https://playbackonline.ca/"
+        url: "https://playbackonline.ca/category/film/"
 
 fetch_policy:
   user_agent: "Codex Film Discovery Agent/1.0"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from jinja2 import Template
 from sqlalchemy import desc, select
@@ -46,9 +47,17 @@ TEMPLATE = Template(
 
 
 class ReportRenderer:
-    def render(self) -> RenderedReport:
+    def render(self, lookback_days: int = 14) -> RenderedReport:
+        cutoff = datetime.utcnow() - timedelta(days=lookback_days)
         with db_session() as session:
-            films = list(session.scalars(select(Film).order_by(desc(Film.opportunity_score)).limit(50)))
+            films = list(
+                session.scalars(
+                    select(Film)
+                    .where(Film.first_seen_at >= cutoff)
+                    .order_by(desc(Film.opportunity_score))
+                    .limit(50)
+                )
+            )
         sections: dict[str, list[Film]] = defaultdict(list)
         for film in films:
             if film.opportunity_score >= 40:
@@ -61,7 +70,7 @@ class ReportRenderer:
                 sections["Horror < $10M (North America / Europe)"].append(film)
             if film.data_confidence_score < 70:
                 sections["Needs Review"].append(film)
-        summary = f"{len(films)} tracked projects in this report window."
+        summary = f"{len(films)} tracked projects in the last {lookback_days} days."
         text_lines = ["Film Intelligence Weekly Report", "", summary]
         for section, items in sections.items():
             text_lines.append("")

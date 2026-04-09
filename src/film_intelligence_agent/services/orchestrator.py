@@ -18,7 +18,9 @@ class WeeklyOrchestrator:
         IMDbIngestionService().run()
         extracted = DiscoveryService(self.config_path).collect()
         FilmPersistenceService().upsert(extracted)
-        report = WeeklyReportService().generate(dry_run=dry_run)
+        report_service = WeeklyReportService()
+        lookback_days = report_service.choose_lookback_days()
+        report = report_service.generate(dry_run=dry_run, lookback_days=lookback_days)
         database_ids = NotionSetupService().ensure_databases()
         notion = NotionSyncService(
             films_database_id=database_ids.get("films_database_id"),
@@ -27,4 +29,4 @@ class WeeklyOrchestrator:
         notion.create_report_page(report.id)
         notion.sync_films()
         if not dry_run:
-            WeeklyReportService().send(dry_run=False)
+            report_service.send(dry_run=False, lookback_days=lookback_days)

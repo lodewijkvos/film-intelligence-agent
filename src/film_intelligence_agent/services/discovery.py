@@ -21,18 +21,18 @@ class DiscoveryService:
             try:
                 html, _digest = self.fetcher.fetch_text(source.name, source.url)
                 parser = get_parser(source.parser_type)
-                collected.extend(
-                    parser.parse(
-                        html,
-                        {
-                            "name": source.name,
-                            "url": source.url,
-                            "tier": source.tier,
-                            "source_type": source.source_type,
-                            "weight": source.weight,
-                        },
-                    )
+                parsed = parser.parse(
+                    html,
+                    {
+                        "name": source.name,
+                        "url": source.url,
+                        "tier": source.tier,
+                        "source_type": source.source_type,
+                        "weight": source.weight,
+                    },
                 )
+                logger.info("Source %s yielded %s candidate rows.", source.name, len(parsed))
+                collected.extend(parsed)
             except Exception as exc:
                 logger.warning("Skipping source %s due to fetch/parse failure: %s", source.name, exc)
         return collected
