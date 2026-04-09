@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from film_intelligence_agent.utils.normalize import normalize_title
+
 
 NOISE_TITLE_FRAGMENTS = (
     "about creative bc",
@@ -97,3 +99,7 @@ def is_probable_project_title(title: str) -> bool:
     }:
         return False
     return True
+
+
+def is_probable_project_title_normalized(title: str) -> bool:
+    return is_probable_project_title(normalize_title(title))

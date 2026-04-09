@@ -18,7 +18,7 @@ from film_intelligence_agent.db.session import db_session
 from film_intelligence_agent.domain.types import ExtractedFilm
 from film_intelligence_agent.services.scoring import compute_data_confidence, compute_opportunity
 from film_intelligence_agent.utils.normalize import normalize_title
-from film_intelligence_agent.utils.quality import is_probable_project_title
+from film_intelligence_agent.utils.quality import is_probable_project_title, is_probable_project_title_normalized
 
 
 class FilmPersistenceService:
@@ -28,7 +28,7 @@ class FilmPersistenceService:
             stale_ids = [
                 film_id
                 for film_id, title in session.execute(select(Film.id, Film.title)).all()
-                if not is_probable_project_title(title)
+                if not is_probable_project_title(title) or not is_probable_project_title_normalized(title)
             ]
             if stale_ids:
                 for model in (SourceRecord, FundingRecord, WarmPath, CollaboratorMatch, FilmCompany, FilmPerson, ReportItem):
@@ -40,6 +40,8 @@ class FilmPersistenceService:
                 if not is_probable_project_title(item.title):
                     continue
                 normalized = normalize_title(item.title)
+                if not is_probable_project_title_normalized(normalized):
+                    continue
                 existing = session.scalar(select(Film).where(Film.normalized_title == normalized))
                 opportunity_score, breakdown = compute_opportunity(item)
                 data_confidence = compute_data_confidence(item)

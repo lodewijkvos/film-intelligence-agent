@@ -1,4 +1,4 @@
-from film_intelligence_agent.utils.quality import is_probable_project_title
+from film_intelligence_agent.utils.quality import is_probable_project_title, is_probable_project_title_normalized
 
 
 def test_project_title_filter_rejects_navigation_labels() -> None:
@@ -16,3 +16,7 @@ def test_project_title_filter_rejects_navigation_labels() -> None:
 def test_project_title_filter_accepts_normal_project_titles() -> None:
     assert is_probable_project_title("Dark Harvest")
     assert is_probable_project_title("The Silent Shore")
+
+
+def test_project_title_filter_rejects_normalized_noise() -> None:
+    assert not is_probable_project_title_normalized("tax credit updates")
