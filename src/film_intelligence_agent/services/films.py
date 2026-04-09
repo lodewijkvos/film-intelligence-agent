@@ -2,21 +2,42 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
-from film_intelligence_agent.db.models import Film, SourceRecord
+from film_intelligence_agent.db.models import (
+    CollaboratorMatch,
+    Film,
+    FilmCompany,
+    FilmPerson,
+    FundingRecord,
+    ReportItem,
+    SourceRecord,
+    WarmPath,
+)
 from film_intelligence_agent.db.session import db_session
 from film_intelligence_agent.domain.types import ExtractedFilm
 from film_intelligence_agent.services.scoring import compute_data_confidence, compute_opportunity
 from film_intelligence_agent.utils.normalize import normalize_title
+from film_intelligence_agent.utils.quality import is_probable_project_title
 
 
 class FilmPersistenceService:
     def upsert(self, films: list[ExtractedFilm]) -> list[Film]:
         persisted: list[Film] = []
         with db_session() as session:
+            stale_ids = [
+                film_id
+                for film_id, title in session.execute(select(Film.id, Film.title)).all()
+                if not is_probable_project_title(title)
+            ]
+            if stale_ids:
+                for model in (SourceRecord, FundingRecord, WarmPath, CollaboratorMatch, FilmCompany, FilmPerson, ReportItem):
+                    session.execute(delete(model).where(model.film_id.in_(stale_ids)))
+                session.execute(delete(Film).where(Film.id.in_(stale_ids)))
             for item in films:
                 if len(item.title) > 300:
+                    continue
+                if not is_probable_project_title(item.title):
                     continue
                 normalized = normalize_title(item.title)
                 existing = session.scalar(select(Film).where(Film.normalized_title == normalized))

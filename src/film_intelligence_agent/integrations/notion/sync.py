@@ -49,6 +49,7 @@ class NotionSyncService:
             return
         with db_session() as session:
             films = list(session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit)))
+        self._clear_existing_film_pages()
         synced_count = 0
         for film in films:
             existing = self.client.data_sources.query(
@@ -104,6 +105,20 @@ class NotionSyncService:
                         ]
                     )
                 )
+
+    def _clear_existing_film_pages(self) -> None:
+        next_cursor: str | None = None
+        while True:
+            payload = {"data_source_id": self.films_database_id, "page_size": 100}
+            if next_cursor:
+                payload["start_cursor"] = next_cursor
+            response = self.client.data_sources.query(**payload)
+            results = response.get("results", [])
+            for page in results:
+                self.client.pages.update(page_id=page["id"], archived=True)
+            if not response.get("has_more"):
+                break
+            next_cursor = response.get("next_cursor")
 
     def create_report_page(self, report_id: str) -> str | None:
         if not self.settings.notion_parent_page_id:
