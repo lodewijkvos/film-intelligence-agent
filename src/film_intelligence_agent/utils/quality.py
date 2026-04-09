@@ -3,9 +3,12 @@ from __future__ import annotations
 
 NOISE_TITLE_FRAGMENTS = (
     "about creative bc",
+    "about the sector",
     "about us",
     "about the industry",
+    "apply online",
     "bc film commission",
+    "facebook",
     "book publishing",
     "calendar",
     "careers",
@@ -19,17 +22,23 @@ NOISE_TITLE_FRAGMENTS = (
     "cross border services",
     "deadlines",
     "film permit",
+    "film incentive bc",
     "filming on location",
     "follow ontario creates",
     "funding available",
+    "funding recipients",
     "funding programs",
     "greater vancouver film offices",
     "guidelines and application form",
     "industries",
     "industry resources",
     "information sessions",
+    "in production",
+    "instagram",
     "interactive digital media",
+    "linkedin",
     "location library",
+    "logos",
     "magazine publishing",
     "media room",
     "motion picture contacts",
@@ -43,6 +52,8 @@ NOISE_TITLE_FRAGMENTS = (
     "overview",
     "production equipment",
     "production credits",
+    "production register",
+    "production services tax credit",
     "protocols",
     "register a production",
     "reel green",
@@ -51,6 +62,8 @@ NOISE_TITLE_FRAGMENTS = (
     "research",
     "resources",
     "sector-wide service",
+    "social",
+    "spotify",
     "stay informed",
     "stages",
     "stories",
@@ -69,5 +82,18 @@ def is_probable_project_title(title: str) -> bool:
     if any(fragment in lowered for fragment in NOISE_TITLE_FRAGMENTS):
         return False
     if cleaned.count(" + ") >= 1:
+        return False
+    if lowered in {
+        "linkedin",
+        "instagram",
+        "facebook",
+        "spotify",
+        "logos",
+        "reports",
+        "overview",
+        "research",
+        "stories",
+        "regions",
+    }:
         return False
     return True
