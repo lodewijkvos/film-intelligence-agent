@@ -6,9 +6,10 @@ import os
 from sqlalchemy import desc, select
 
 from film_intelligence_agent.config.settings import get_settings
-from film_intelligence_agent.db.models import Film, WeeklyReport
+from film_intelligence_agent.db.models import Film, ReportItem, WeeklyReport
 from film_intelligence_agent.db.session import db_session
 from film_intelligence_agent.integrations.notion.client import get_notion_client
+from film_intelligence_agent.reports.render import SECTION_EMPTY_STATES, SECTION_ORDER
 from film_intelligence_agent.services.config_store import ConfigStore
 from film_intelligence_agent.utils.normalize import normalize_title
 from film_intelligence_agent.utils.quality import is_probable_project_title, is_probable_project_title_normalized
@@ -154,19 +155,80 @@ class NotionSyncService:
             return None
         with db_session() as session:
             report = session.scalar(select(WeeklyReport).where(WeeklyReport.id == report_id))
+            report_items = list(
+                session.scalars(
+                    select(ReportItem).where(ReportItem.weekly_report_id == report_id).order_by(ReportItem.section_name, ReportItem.rank)
+                )
+            )
         if report is None:
             return None
+        items_by_section: dict[str, list[ReportItem]] = {section_name: [] for section_name in SECTION_ORDER}
+        for item in report_items:
+            items_by_section.setdefault(item.section_name, []).append(item)
+
+        children: list[dict] = [
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"type": "text", "text": {"content": report.summary_text or ""}}]},
+            },
+            {"object": "block", "type": "divider", "divider": {}},
+        ]
+
+        weekly_summary_lines = [
+            f"Dry run: {'Yes' if report.dry_run else 'No'}",
+            "This page is intended to mirror the weekly email structure.",
+        ]
+
+        for section_name in SECTION_ORDER:
+            children.append(
+                {
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {"rich_text": [{"type": "text", "text": {"content": section_name}}]},
+                }
+            )
+            if section_name == "Weekly Summary":
+                for line in weekly_summary_lines:
+                    children.append(
+                        {
+                            "object": "block",
+                            "type": "bulleted_list_item",
+                            "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": line}}]},
+                        }
+                    )
+                continue
+            section_items = items_by_section.get(section_name, [])
+            if not section_items:
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": [{"type": "text", "text": {"content": SECTION_EMPTY_STATES[section_name]}}]
+                        },
+                    }
+                )
+                continue
+            for item in section_items:
+                payload = item.item_payload or {}
+                title = payload.get("title") or "Untitled"
+                status = payload.get("status") or "Unknown"
+                budget = payload.get("budget") or "Unknown"
+                content = f"{title}\nBudget: {budget}\nStatus: {status}"
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": content[:1900]}}]},
+                    }
+                )
+
         response = self.client.pages.create(
             parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
             properties={
                 "title": [{"type": "text", "text": {"content": f"Weekly Report {report.report_date.isoformat()}"}}]
             },
-            children=[
-                {
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": report.summary_text or ""}}]},
-                }
-            ],
+            children=children[:100],
         )
         return response["id"]
