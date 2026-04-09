@@ -180,6 +180,27 @@ class NotionSyncService:
             "This page is intended to mirror the weekly email structure.",
         ]
 
+        def text_part(content: str, url: str | None = None, bold: bool = False) -> dict:
+            annotations = {"bold": bold} if bold else {}
+            text = {"content": content}
+            if url and url != "Unknown":
+                text["link"] = {"url": url}
+            return {"type": "text", "text": text, "annotations": annotations}
+
+        def line_parts(label: str, value: str, url: str | None = None) -> list[dict]:
+            return [text_part(f"{label}: ", bold=True), text_part(value or "Unknown", url=url), text_part("\n")]
+
+        def producer_parts(producer_links: list[dict]) -> list[dict]:
+            if not producer_links:
+                return line_parts("Producers", "Unknown")
+            parts = [text_part("Producers: ", bold=True)]
+            for index, producer in enumerate(producer_links):
+                if index:
+                    parts.append(text_part(", "))
+                parts.append(text_part(producer.get("name") or "Unknown", url=producer.get("url")))
+            parts.append(text_part("\n"))
+            return parts
+
         for section_name in SECTION_ORDER:
             children.append(
                 {
@@ -215,12 +236,37 @@ class NotionSyncService:
                 title = payload.get("title") or "Untitled"
                 status = payload.get("status") or "Unknown"
                 budget = payload.get("budget") or "Unknown"
-                content = f"{title}\nBudget: {budget}\nStatus: {status}"
+                country = payload.get("country") or "Unknown"
+                region = payload.get("region") or "Unknown"
+                production_company = payload.get("production_company") or "Unknown"
+                director = payload.get("director") or "Unknown"
+                editor = payload.get("editor") or "Unknown"
+                composer = payload.get("composer") or "Unknown"
+                imdb_link = payload.get("title_url")
+                source_name = payload.get("source_name") or "Unknown"
+                source_url = payload.get("source_url") or "Unknown"
+                production_company_url = payload.get("production_company_url")
+                director_url = payload.get("director_url")
+                editor_url = payload.get("editor_url")
+                composer_url = payload.get("composer_url")
+                producer_links = payload.get("producer_links") or []
+                rich_text = [text_part(title, url=imdb_link, bold=True), text_part("\n")]
+                rich_text.extend(line_parts("Country", country))
+                rich_text.extend(line_parts("Region", region))
+                rich_text.extend(line_parts("Budget", budget))
+                rich_text.extend(line_parts("Production Company", production_company, url=production_company_url))
+                rich_text.extend(line_parts("Director", director, url=director_url))
+                rich_text.extend(line_parts("Editor", editor, url=editor_url))
+                rich_text.extend(line_parts("Composer", composer, url=composer_url))
+                rich_text.extend(producer_parts(producer_links))
+                rich_text.extend(line_parts("Status", status))
+                rich_text.extend(line_parts("IMDb", imdb_link or "Unknown", url=imdb_link))
+                rich_text.extend(line_parts("Source", source_name, url=source_url))
                 children.append(
                     {
                         "object": "block",
                         "type": "bulleted_list_item",
-                        "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": content[:1900]}}]},
+                        "bulleted_list_item": {"rich_text": rich_text[:100]},
                     }
                 )
 

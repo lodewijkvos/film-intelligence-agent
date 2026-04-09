@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from jinja2 import Template
 from sqlalchemy import desc, select
 
-from film_intelligence_agent.db.models import Film
+from film_intelligence_agent.db.models import Company, Film, FilmCompany, FilmPerson, Person
 from film_intelligence_agent.db.session import db_session
 
 
@@ -36,9 +36,35 @@ class RenderedReport:
     summary: str
     html: str
     text: str
-    sections: dict[str, list[Film]]
+    sections: dict[str, list["ProjectCard"]]
     stats: dict[str, int]
     lookback_days: int
+
+
+@dataclass(slots=True)
+class ProjectCard:
+    film_id: str
+    title: str
+    title_url: str | None
+    status: str
+    budget: str
+    country: str
+    region: str
+    production_company: str
+    production_company_url: str | None
+    director: str
+    director_url: str | None
+    editor: str
+    editor_url: str | None
+    composer: str
+    composer_url: str | None
+    producers: str
+    producer_links: list[tuple[str, str | None]]
+    source_name: str
+    source_url: str
+    opportunity_score: int
+    data_confidence_score: int
+    genre: str | None
 
 
 TEMPLATE = Template(
@@ -76,20 +102,64 @@ TEMPLATE = Template(
                   {% for film in sections[section_name] %}
                     <div style="margin:0 0 14px;padding:14px 16px;border:1px solid #eadfce;border-radius:14px;background:#fcfaf6;">
                       <div style="font-size:18px;font-weight:700;margin-bottom:10px;">
-                        {% if film.imdb_url %}
-                          <a href="{{ film.imdb_url }}" style="color:#1f4f46;text-decoration:none;">{{ film.title }}</a>
+                        {% if film.title_url %}
+                          <a href="{{ film.title_url }}" style="color:#1f4f46;text-decoration:none;">{{ film.title }}</a>
                         {% else %}
                           {{ film.title }}
                         {% endif %}
                       </div>
                       <div style="font-size:14px;line-height:1.7;color:#332d26;">
-                        <div><strong>Budget:</strong> {{ film.budget_text or "Unknown" }}</div>
-                        <div><strong>Region:</strong> {{ film.region or film.country or "Unknown" }}</div>
-                        <div><strong>Production Company:</strong> {{ film.production_company or "Unknown" }}</div>
-                        <div><strong>Director:</strong> Unknown</div>
-                        <div><strong>Composer:</strong> Unknown</div>
-                        <div><strong>Producers:</strong> Unknown</div>
-                        <div><strong>Status:</strong> {{ film.status or "Unknown" }}</div>
+                        <div><strong>Country:</strong> {{ film.country }}</div>
+                        <div><strong>Region:</strong> {{ film.region }}</div>
+                        <div><strong>Budget:</strong> {{ film.budget }}</div>
+                        <div>
+                          <strong>Production Company:</strong>
+                          {% if film.production_company_url %}
+                            <a href="{{ film.production_company_url }}" style="color:#1f4f46;">{{ film.production_company }}</a>
+                          {% else %}
+                            {{ film.production_company }}
+                          {% endif %}
+                        </div>
+                        <div>
+                          <strong>Director:</strong>
+                          {% if film.director_url %}
+                            <a href="{{ film.director_url }}" style="color:#1f4f46;">{{ film.director }}</a>
+                          {% else %}
+                            {{ film.director }}
+                          {% endif %}
+                        </div>
+                        <div>
+                          <strong>Editor:</strong>
+                          {% if film.editor_url %}
+                            <a href="{{ film.editor_url }}" style="color:#1f4f46;">{{ film.editor }}</a>
+                          {% else %}
+                            {{ film.editor }}
+                          {% endif %}
+                        </div>
+                        <div>
+                          <strong>Composer:</strong>
+                          {% if film.composer_url %}
+                            <a href="{{ film.composer_url }}" style="color:#1f4f46;">{{ film.composer }}</a>
+                          {% else %}
+                            {{ film.composer }}
+                          {% endif %}
+                        </div>
+                        <div>
+                          <strong>Producers:</strong>
+                          {% if film.producer_links %}
+                            {% for producer_name, producer_url in film.producer_links %}
+                              {% if not loop.first %}, {% endif %}
+                              {% if producer_url %}
+                                <a href="{{ producer_url }}" style="color:#1f4f46;">{{ producer_name }}</a>
+                              {% else %}
+                                {{ producer_name }}
+                              {% endif %}
+                            {% endfor %}
+                          {% else %}
+                            Unknown
+                          {% endif %}
+                        </div>
+                        <div><strong>Status:</strong> {{ film.status }}</div>
                         <div><strong>Source:</strong> <a href="{{ film.source_url }}" style="color:#1f4f46;">{{ film.source_name }}</a></div>
                       </div>
                     </div>
@@ -119,22 +189,23 @@ class ReportRenderer:
                     .limit(100)
                 )
             )
+            cards = [self._build_card(session, film) for film in films]
 
-        sections: dict[str, list[Film]] = {name: [] for name in SECTION_ORDER}
-        top_opportunities = [film for film in films if film.opportunity_score >= 40][:8]
-        funded_canada = [film for film in films if film.country == "Canada" and film.status == "funded"][:8]
+        sections: dict[str, list[ProjectCard]] = {name: [] for name in SECTION_ORDER}
+        top_opportunities = [card for film, card in zip(films, cards, strict=False) if film.opportunity_score >= 40][:8]
+        funded_canada = [card for film, card in zip(films, cards, strict=False) if film.country == "Canada" and film.status == "funded"][:8]
         canada_greenlights = [
-            film for film in films if film.country == "Canada" and film.status in {"greenlit", "production"}
+            card for film, card in zip(films, cards, strict=False) if film.country == "Canada" and film.status in {"greenlit", "production"}
         ][:8]
         horror_targets = [
-            film
-            for film in films
+            card
+            for film, card in zip(films, cards, strict=False)
             if film.genre
             and "horror" in film.genre.lower()
             and (film.region in {"Canada", "North America", "Europe"} or film.country in {"Canada", "United States"})
         ][:8]
-        collaborator_matches: list[Film] = []
-        needs_review = [film for film in films if film.data_confidence_score < 70][:8]
+        collaborator_matches: list[ProjectCard] = []
+        needs_review = [card for film, card in zip(films, cards, strict=False) if film.data_confidence_score < 70][:8]
 
         sections["Top Opportunities"] = top_opportunities
         sections["Newly Funded Canadian Projects (Early Opportunities)"] = funded_canada
@@ -147,7 +218,7 @@ class ReportRenderer:
         stats = {
             "Projects Included": len(films),
             "Top Opportunities": len(top_opportunities),
-            "Canada Signals": len({film.id for film in funded_canada + canada_greenlights}),
+            "Canada Signals": len({card.film_id for card in funded_canada + canada_greenlights}),
             "Needs Review": len(needs_review),
         }
         summary = (
@@ -177,13 +248,16 @@ class ReportRenderer:
                     text_lines.extend(
                         [
                             f"- {film.title}",
-                            f"  Budget: {film.budget_text or 'Unknown'}",
-                            f"  Region: {film.region or film.country or 'Unknown'}",
-                            f"  Production Company: {film.production_company or 'Unknown'}",
-                            "  Director: Unknown",
-                            "  Composer: Unknown",
-                            "  Producers: Unknown",
-                            f"  Status: {film.status or 'Unknown'}",
+                            f"  Country: {film.country}",
+                            f"  Region: {film.region}",
+                            f"  Budget: {film.budget}",
+                            f"  Production Company: {film.production_company}",
+                            f"  Director: {film.director}",
+                            f"  Editor: {film.editor}",
+                            f"  Composer: {film.composer}",
+                            f"  Producers: {film.producers}",
+                            f"  Status: {film.status}",
+                            f"  IMDb: {film.title_url or 'Unknown'}",
                             f"  Source: {film.source_name} ({film.source_url})",
                         ]
                     )
@@ -206,4 +280,78 @@ class ReportRenderer:
             sections=sections,
             stats=stats,
             lookback_days=lookback_days,
+        )
+
+    def _build_card(self, session, film: Film) -> ProjectCard:
+        people_rows = session.execute(
+            select(FilmPerson.role, Person.full_name, Person.imdb_url)
+            .join(Person, Person.id == FilmPerson.person_id)
+            .where(FilmPerson.film_id == film.id)
+            .order_by(FilmPerson.role, Person.full_name)
+        ).all()
+        company_rows = session.execute(
+            select(FilmCompany.role, Company.name, Company.imdb_url)
+            .join(Company, Company.id == FilmCompany.company_id)
+            .where(FilmCompany.film_id == film.id)
+            .order_by(FilmCompany.role, Company.name)
+        ).all()
+
+        def first_person(*roles: str) -> tuple[str, str | None]:
+            role_set = {role.lower() for role in roles}
+            for role, full_name, imdb_url in people_rows:
+                if (role or "").lower() in role_set:
+                    return full_name, imdb_url
+            return "Unknown", None
+
+        def collect_people(*roles: str) -> list[tuple[str, str | None]]:
+            role_set = {role.lower() for role in roles}
+            results: list[tuple[str, str | None]] = []
+            seen: set[str] = set()
+            for role, full_name, imdb_url in people_rows:
+                if (role or "").lower() not in role_set:
+                    continue
+                key = full_name.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                results.append((full_name, imdb_url))
+            return results
+
+        def first_company(*roles: str) -> tuple[str, str | None]:
+            role_set = {role.lower() for role in roles}
+            for role, name, imdb_url in company_rows:
+                if (role or "").lower() in role_set:
+                    return name, imdb_url
+            return film.production_company or "Unknown", None
+
+        director, director_url = first_person("director")
+        editor, editor_url = first_person("editor")
+        composer, composer_url = first_person("composer")
+        producers = collect_people("producer", "executive producer")
+        producer_label = ", ".join(name for name, _url in producers) if producers else "Unknown"
+        production_company, production_company_url = first_company("production_company", "producer", "studio")
+
+        return ProjectCard(
+            film_id=film.id,
+            title=film.title,
+            title_url=film.imdb_url,
+            status=film.status or "Unknown",
+            budget=film.budget_text or "Unknown",
+            country=film.country or "Unknown",
+            region=film.region or film.country or "Unknown",
+            production_company=production_company,
+            production_company_url=production_company_url,
+            director=director,
+            director_url=director_url,
+            editor=editor,
+            editor_url=editor_url,
+            composer=composer,
+            composer_url=composer_url,
+            producers=producer_label,
+            producer_links=producers,
+            source_name=film.source_name,
+            source_url=film.source_url,
+            opportunity_score=film.opportunity_score,
+            data_confidence_score=film.data_confidence_score,
+            genre=film.genre,
         )

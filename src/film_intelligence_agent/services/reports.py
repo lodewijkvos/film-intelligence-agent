@@ -31,10 +31,31 @@ class WeeklyReportService:
                     session.add(
                         ReportItem(
                             weekly_report_id=report.id,
-                            film_id=film.id,
+                            film_id=film.film_id,
                             section_name=section,
                             rank=rank,
-                            item_payload={"title": film.title, "status": film.status, "budget": film.budget_text},
+                            item_payload={
+                                "title": film.title,
+                                "title_url": film.title_url,
+                                "status": film.status,
+                                "budget": film.budget,
+                                "country": film.country,
+                                "region": film.region,
+                                "production_company": film.production_company,
+                                "production_company_url": film.production_company_url,
+                                "director": film.director,
+                                "director_url": film.director_url,
+                                "editor": film.editor,
+                                "editor_url": film.editor_url,
+                                "composer": film.composer,
+                                "composer_url": film.composer_url,
+                                "producers": film.producers,
+                                "producer_links": [
+                                    {"name": name, "url": url} for name, url in film.producer_links
+                                ],
+                                "source_name": film.source_name,
+                                "source_url": film.source_url,
+                            },
                         )
                     )
         return report
