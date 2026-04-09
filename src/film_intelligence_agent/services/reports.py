@@ -45,13 +45,22 @@ class WeeklyReportService:
                                 "production_company_url": film.production_company_url,
                                 "director": film.director,
                                 "director_url": film.director_url,
+                                "director_note": film.director_note,
                                 "editor": film.editor,
                                 "editor_url": film.editor_url,
+                                "editor_note": film.editor_note,
                                 "composer": film.composer,
                                 "composer_url": film.composer_url,
+                                "composer_note": film.composer_note,
                                 "producers": film.producers,
                                 "producer_links": [
                                     {"name": name, "url": url} for name, url in film.producer_links
+                                ],
+                                "producer_notes": film.producer_notes,
+                                "opportunity_score": film.opportunity_score,
+                                "why_this_matters": film.why_this_matters,
+                                "recent_sources": [
+                                    {"name": name, "url": url} for name, url in film.recent_sources
                                 ],
                                 "source_name": film.source_name,
                                 "source_url": film.source_url,

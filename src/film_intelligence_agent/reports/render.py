@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from jinja2 import Template
 from sqlalchemy import desc, select
 
-from film_intelligence_agent.db.models import Company, Film, FilmCompany, FilmPerson, Person
+from film_intelligence_agent.db.models import Collaborator, Company, Film, FilmCompany, FilmPerson, Person
 from film_intelligence_agent.db.session import db_session
 
 
@@ -54,122 +54,138 @@ class ProjectCard:
     production_company_url: str | None
     director: str
     director_url: str | None
+    director_note: str | None
     editor: str
     editor_url: str | None
+    editor_note: str | None
     composer: str
     composer_url: str | None
+    composer_note: str | None
     producers: str
     producer_links: list[tuple[str, str | None]]
+    producer_notes: dict[str, str]
     source_name: str
     source_url: str
     opportunity_score: int
     data_confidence_score: int
     genre: str | None
+    why_this_matters: str
+    recent_sources: list[tuple[str, str | None]]
 
 
 TEMPLATE = Template(
     """
     <html>
-      <body style="margin:0;padding:0;background:#f4f1ea;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a1a;">
-        <div style="max-width:900px;margin:0 auto;padding:32px 24px 48px;">
-          <div style="background:#ffffff;border:1px solid #e2d8c7;border-radius:20px;padding:32px;">
-            <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#7a6d5b;">Film Intelligence Agent</p>
-            <h1 style="margin:0 0 12px;font-size:34px;line-height:1.1;">Weekly Intelligence Report</h1>
-            <p style="margin:0 0 20px;font-size:17px;line-height:1.5;color:#4f463b;">{{ summary }}</p>
+      <body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111111;">
+        <div style="max-width:860px;margin:0 auto;padding:28px 24px 48px;">
+          <div style="font-size:24px;font-weight:800;margin-bottom:6px;">🎬 Weekly Film Intelligence Report</div>
+          <div style="font-size:14px;color:#444444;margin-bottom:18px;">{{ report_label }}</div>
+          <div style="border-top:1px solid #dddddd;margin:0 0 24px;"></div>
 
-            <table role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 28px;">
-              <tr>
-                {% for label, value in stats.items() %}
-                <td style="padding:12px 10px;border:1px solid #eadfce;background:#faf7f1;">
-                  <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:#7a6d5b;">{{ label }}</div>
-                  <div style="font-size:22px;font-weight:700;margin-top:4px;">{{ value }}</div>
-                </td>
-                {% endfor %}
-              </tr>
-            </table>
-
-            {% for section_name in section_order %}
-              <div style="margin:0 0 28px;">
-                <h2 style="margin:0 0 10px;font-size:20px;">{{ section_name }}</h2>
-                {% if section_name == "Weekly Summary" %}
-                  <ul style="margin:0;padding-left:20px;color:#3f382f;line-height:1.6;">
-                    <li>Lookback window: {{ lookback_days }} days</li>
-                    <li>Total qualified projects mirrored this run: {{ stats["Projects Included"] }}</li>
-                    <li>Canadian funded/greenlit projects: {{ stats["Canada Signals"] }}</li>
-                    <li>Needs review items: {{ stats["Needs Review"] }}</li>
-                  </ul>
-                {% elif sections[section_name] %}
-                  {% for film in sections[section_name] %}
-                    <div style="margin:0 0 14px;padding:14px 16px;border:1px solid #eadfce;border-radius:14px;background:#fcfaf6;">
-                      <div style="font-size:18px;font-weight:700;margin-bottom:10px;">
-                        {% if film.title_url %}
-                          <a href="{{ film.title_url }}" style="color:#1f4f46;text-decoration:none;">{{ film.title }}</a>
+          {% for section_name in section_order %}
+            <div style="margin:0 0 26px;">
+              <h2 style="margin:0 0 14px;font-size:22px;">{{ section_icons.get(section_name, "•") }} {{ section_name }}</h2>
+              {% if section_name == "Weekly Summary" %}
+                <ul style="margin:0;padding-left:20px;line-height:1.8;">
+                  <li>Lookback window: {{ lookback_days }} days</li>
+                  <li>Total qualified projects mirrored this run: {{ stats["Projects Included"] }}</li>
+                  <li>Canadian funded/greenlit projects: {{ stats["Canada Signals"] }}</li>
+                  <li>Needs review items: {{ stats["Needs Review"] }}</li>
+                </ul>
+              {% elif sections[section_name] %}
+                {% for film in sections[section_name] %}
+                  <div style="margin:0 0 18px;">
+                    <div style="font-size:18px;font-weight:700;margin-bottom:8px;">
+                      {% if film.title_url %}
+                        <a href="{{ film.title_url }}" style="color:#111111;text-decoration:underline;">{{ film.title }}</a>
+                      {% else %}
+                        {{ film.title }}
+                      {% endif %}
+                    </div>
+                    <ul style="margin:0;padding-left:22px;line-height:1.8;">
+                      <li><strong>Budget:</strong> {{ film.budget }}</li>
+                      <li><strong>Country:</strong> {{ film.country }}</li>
+                      <li><strong>Region:</strong> {{ film.region }}</li>
+                      <li><strong>Production Company:</strong>
+                        {% if film.production_company_url %}
+                          <a href="{{ film.production_company_url }}" style="color:#111111;">{{ film.production_company }}</a>
                         {% else %}
-                          {{ film.title }}
+                          {{ film.production_company }}
                         {% endif %}
-                      </div>
-                      <div style="font-size:14px;line-height:1.7;color:#332d26;">
-                        <div><strong>Country:</strong> {{ film.country }}</div>
-                        <div><strong>Region:</strong> {{ film.region }}</div>
-                        <div><strong>Budget:</strong> {{ film.budget }}</div>
-                        <div>
-                          <strong>Production Company:</strong>
-                          {% if film.production_company_url %}
-                            <a href="{{ film.production_company_url }}" style="color:#1f4f46;">{{ film.production_company }}</a>
-                          {% else %}
-                            {{ film.production_company }}
-                          {% endif %}
-                        </div>
-                        <div>
-                          <strong>Director:</strong>
-                          {% if film.director_url %}
-                            <a href="{{ film.director_url }}" style="color:#1f4f46;">{{ film.director }}</a>
-                          {% else %}
-                            {{ film.director }}
-                          {% endif %}
-                        </div>
-                        <div>
-                          <strong>Editor:</strong>
-                          {% if film.editor_url %}
-                            <a href="{{ film.editor_url }}" style="color:#1f4f46;">{{ film.editor }}</a>
-                          {% else %}
-                            {{ film.editor }}
-                          {% endif %}
-                        </div>
-                        <div>
-                          <strong>Composer:</strong>
-                          {% if film.composer_url %}
-                            <a href="{{ film.composer_url }}" style="color:#1f4f46;">{{ film.composer }}</a>
-                          {% else %}
-                            {{ film.composer }}
-                          {% endif %}
-                        </div>
-                        <div>
-                          <strong>Producers:</strong>
+                      </li>
+                      <li><strong>Director:</strong>
+                        {% if film.director_url %}
+                          <a href="{{ film.director_url }}" style="color:#111111;">{{ film.director }}</a>
+                        {% else %}
+                          {{ film.director }}
+                        {% endif %}
+                        {% if film.director_note %}<em> {{ film.director_note }}</em>{% endif %}
+                      </li>
+                      <li><strong>Editor:</strong>
+                        {% if film.editor_url %}
+                          <a href="{{ film.editor_url }}" style="color:#111111;">{{ film.editor }}</a>
+                        {% else %}
+                          {{ film.editor }}
+                        {% endif %}
+                        {% if film.editor_note %}<em> {{ film.editor_note }}</em>{% endif %}
+                      </li>
+                      <li><strong>Composer:</strong>
+                        {% if film.composer_url %}
+                          <a href="{{ film.composer_url }}" style="color:#111111;">{{ film.composer }}</a>
+                        {% else %}
+                          {{ film.composer }}
+                        {% endif %}
+                        {% if film.composer_note %}<em> {{ film.composer_note }}</em>{% endif %}
+                      </li>
+                      <li><strong>Producers:</strong>
+                        <ul style="margin:4px 0 0;padding-left:20px;">
                           {% if film.producer_links %}
                             {% for producer_name, producer_url in film.producer_links %}
-                              {% if not loop.first %}, {% endif %}
-                              {% if producer_url %}
-                                <a href="{{ producer_url }}" style="color:#1f4f46;">{{ producer_name }}</a>
-                              {% else %}
-                                {{ producer_name }}
-                              {% endif %}
+                              <li>
+                                {% if producer_url %}
+                                  <a href="{{ producer_url }}" style="color:#111111;">{{ producer_name }}</a>
+                                {% else %}
+                                  {{ producer_name }}
+                                {% endif %}
+                                {% if film.producer_notes.get(producer_name) %}<em> {{ film.producer_notes.get(producer_name) }}</em>{% endif %}
+                              </li>
                             {% endfor %}
                           {% else %}
-                            Unknown
+                            <li>Unknown</li>
                           {% endif %}
-                        </div>
-                        <div><strong>Status:</strong> {{ film.status }}</div>
-                        <div><strong>Source:</strong> <a href="{{ film.source_url }}" style="color:#1f4f46;">{{ film.source_name }}</a></div>
-                      </div>
-                    </div>
-                  {% endfor %}
-                {% else %}
-                  <p style="margin:0;color:#6c6256;line-height:1.6;">{{ empty_states[section_name] }}</p>
-                {% endif %}
-              </div>
-            {% endfor %}
-          </div>
+                        </ul>
+                      </li>
+                      <li><strong>Status:</strong> {{ film.status }}</li>
+                      <li><strong>Opportunity Score:</strong> {{ film.opportunity_score }}</li>
+                      <li><strong>Why this matters:</strong> {{ film.why_this_matters }}</li>
+                      <li><strong>Recent Press / Sources:</strong>
+                        <ul style="margin:4px 0 0;padding-left:20px;">
+                          {% if film.recent_sources %}
+                            {% for source_name, source_url in film.recent_sources %}
+                              <li>
+                                {% if source_url %}
+                                  <a href="{{ source_url }}" style="color:#111111;">{{ source_name }}</a>
+                                {% else %}
+                                  {{ source_name }}
+                                {% endif %}
+                              </li>
+                            {% endfor %}
+                          {% else %}
+                            <li>No recent sources attached yet.</li>
+                          {% endif %}
+                        </ul>
+                      </li>
+                    </ul>
+                  </div>
+                  {% if not loop.last %}
+                    <div style="border-top:1px solid #dddddd;margin:16px 0 18px;"></div>
+                  {% endif %}
+                {% endfor %}
+              {% else %}
+                <p style="margin:0;color:#555555;line-height:1.6;">{{ empty_states[section_name] }}</p>
+              {% endif %}
+            </div>
+          {% endfor %}
         </div>
       </body>
     </html>
@@ -180,6 +196,16 @@ TEMPLATE = Template(
 class ReportRenderer:
     def render(self, lookback_days: int = 14) -> RenderedReport:
         cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+        report_label = f"Week of {datetime.utcnow().strftime('%B %-d, %Y')}"
+        section_icons = {
+            "Top Opportunities": "🎯",
+            "Newly Funded Canadian Projects (Early Opportunities)": "🍁",
+            "Canada Greenlights": "🇨🇦",
+            "Horror < $10M (North America / Europe)": "🩸",
+            "Collaborator Matches": "🤝",
+            "Needs Review": "⚠️",
+            "Weekly Summary": "📝",
+        }
         with db_session() as session:
             films = list(
                 session.scalars(
@@ -221,19 +247,17 @@ class ReportRenderer:
             "Canada Signals": len({card.film_id for card in funded_canada + canada_greenlights}),
             "Needs Review": len(needs_review),
         }
-        summary = (
-            f"{len(films)} qualified film/series projects in the last {lookback_days} days. "
-            f"This page mirrors the email structure you’ll receive every Monday at 9:00 a.m. Toronto time."
-        )
+        summary = f"{len(films)} qualified film and series projects in the current report window."
 
         text_lines = [
-            "Film Intelligence Weekly Report",
+            "Weekly Film Intelligence Report",
+            report_label,
             "",
             summary,
             "",
         ]
         for section_name in SECTION_ORDER:
-            text_lines.append(section_name)
+            text_lines.append(f"{section_icons.get(section_name, '-')} {section_name}")
             if section_name == "Weekly Summary":
                 text_lines.extend(
                     [
@@ -247,7 +271,7 @@ class ReportRenderer:
                 for film in sections[section_name]:
                     text_lines.extend(
                         [
-                            f"- {film.title}",
+                            film.title,
                             f"  Country: {film.country}",
                             f"  Region: {film.region}",
                             f"  Budget: {film.budget}",
@@ -257,18 +281,28 @@ class ReportRenderer:
                             f"  Composer: {film.composer}",
                             f"  Producers: {film.producers}",
                             f"  Status: {film.status}",
+                            f"  Opportunity Score: {film.opportunity_score}",
+                            f"  Why this matters: {film.why_this_matters}",
                             f"  IMDb: {film.title_url or 'Unknown'}",
                             f"  Source: {film.source_name} ({film.source_url})",
                         ]
                     )
+                    if film.recent_sources:
+                        text_lines.append("  Recent Press / Sources:")
+                        for source_name, source_url in film.recent_sources:
+                            text_lines.append(f"    - {source_name} ({source_url or 'Unknown'})")
+                    else:
+                        text_lines.append("  Recent Press / Sources: No recent sources attached yet.")
             else:
                 text_lines.append(f"- {SECTION_EMPTY_STATES[section_name]}")
             text_lines.append("")
 
         html = TEMPLATE.render(
             summary=summary,
+            report_label=report_label,
             sections=sections,
             section_order=SECTION_ORDER,
+            section_icons=section_icons,
             empty_states=SECTION_EMPTY_STATES,
             stats=stats,
             lookback_days=lookback_days,
@@ -284,8 +318,15 @@ class ReportRenderer:
 
     def _build_card(self, session, film: Film) -> ProjectCard:
         people_rows = session.execute(
-            select(FilmPerson.role, Person.full_name, Person.imdb_url)
+            select(
+                FilmPerson.role,
+                Person.full_name,
+                Person.imdb_url,
+                Person.is_known_collaborator,
+                Collaborator.shared_project_names,
+            )
             .join(Person, Person.id == FilmPerson.person_id)
+            .outerjoin(Collaborator, Collaborator.person_id == Person.id)
             .where(FilmPerson.film_id == film.id)
             .order_by(FilmPerson.role, Person.full_name)
         ).all()
@@ -296,25 +337,35 @@ class ReportRenderer:
             .order_by(FilmCompany.role, Company.name)
         ).all()
 
-        def first_person(*roles: str) -> tuple[str, str | None]:
-            role_set = {role.lower() for role in roles}
-            for role, full_name, imdb_url in people_rows:
-                if (role or "").lower() in role_set:
-                    return full_name, imdb_url
-            return "Unknown", None
+        def collaborator_note(is_known: bool, shared_projects: list[str] | None) -> str | None:
+            if not is_known and not shared_projects:
+                return None
+            if shared_projects:
+                sample = ", ".join(shared_projects[:2])
+                extra = max(len(shared_projects) - 2, 0)
+                suffix = f" +{extra} more" if extra else ""
+                return f"(worked with you: {sample}{suffix})"
+            return "(worked with you)"
 
-        def collect_people(*roles: str) -> list[tuple[str, str | None]]:
+        def first_person(*roles: str) -> tuple[str, str | None, str | None]:
             role_set = {role.lower() for role in roles}
-            results: list[tuple[str, str | None]] = []
+            for role, full_name, imdb_url, is_known, shared_projects in people_rows:
+                if (role or "").lower() in role_set:
+                    return full_name, imdb_url, collaborator_note(bool(is_known), shared_projects)
+            return "Unknown", None, None
+
+        def collect_people(*roles: str) -> list[tuple[str, str | None, str | None]]:
+            role_set = {role.lower() for role in roles}
+            results: list[tuple[str, str | None, str | None]] = []
             seen: set[str] = set()
-            for role, full_name, imdb_url in people_rows:
+            for role, full_name, imdb_url, is_known, shared_projects in people_rows:
                 if (role or "").lower() not in role_set:
                     continue
                 key = full_name.lower()
                 if key in seen:
                     continue
                 seen.add(key)
-                results.append((full_name, imdb_url))
+                results.append((full_name, imdb_url, collaborator_note(bool(is_known), shared_projects)))
             return results
 
         def first_company(*roles: str) -> tuple[str, str | None]:
@@ -324,12 +375,26 @@ class ReportRenderer:
                     return name, imdb_url
             return film.production_company or "Unknown", None
 
-        director, director_url = first_person("director")
-        editor, editor_url = first_person("editor")
-        composer, composer_url = first_person("composer")
+        director, director_url, director_note = first_person("director")
+        editor, editor_url, editor_note = first_person("editor")
+        composer, composer_url, composer_note = first_person("composer")
         producers = collect_people("producer", "executive producer")
-        producer_label = ", ".join(name for name, _url in producers) if producers else "Unknown"
+        producer_label = ", ".join(name for name, _url, _note in producers) if producers else "Unknown"
         production_company, production_company_url = first_company("production_company", "producer", "studio")
+        producer_notes = {name: note for name, _url, note in producers if note}
+        why_bits = []
+        if "canada" in (film.country or "").lower() or "canada" in (film.region or "").lower():
+            why_bits.append("Canada-first signal")
+        if film.status:
+            why_bits.append(f"status is {film.status}")
+        if producers and producer_notes:
+            why_bits.append("known collaborator overlap on producing team")
+        elif director_note or editor_note or composer_note:
+            why_bits.append("known collaborator overlap on key creative team")
+        if film.source_name:
+            why_bits.append(f"source: {film.source_name}")
+        why_this_matters = ". ".join(why_bits).capitalize() + "." if why_bits else "Needs manual review."
+        recent_sources = [(film.source_name, film.source_url)] if film.source_name and film.source_url else []
 
         return ProjectCard(
             film_id=film.id,
@@ -343,15 +408,21 @@ class ReportRenderer:
             production_company_url=production_company_url,
             director=director,
             director_url=director_url,
+            director_note=director_note,
             editor=editor,
             editor_url=editor_url,
+            editor_note=editor_note,
             composer=composer,
             composer_url=composer_url,
+            composer_note=composer_note,
             producers=producer_label,
-            producer_links=producers,
+            producer_links=[(name, url) for name, url, _note in producers],
+            producer_notes=producer_notes,
             source_name=film.source_name,
             source_url=film.source_url,
             opportunity_score=film.opportunity_score,
             data_confidence_score=film.data_confidence_score,
             genre=film.genre,
+            why_this_matters=why_this_matters,
+            recent_sources=recent_sources,
         )

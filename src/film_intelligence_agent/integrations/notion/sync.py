@@ -176,12 +176,20 @@ class NotionSyncService:
         ]
 
         weekly_summary_lines = [
+            f"Week of {report.report_date.strftime('%B %d, %Y')}",
             f"Dry run: {'Yes' if report.dry_run else 'No'}",
             "This page is intended to mirror the weekly email structure.",
         ]
 
         def text_part(content: str, url: str | None = None, bold: bool = False) -> dict:
-            annotations = {"bold": bold} if bold else {}
+            annotations = {
+                "bold": bold,
+                "italic": False,
+                "strikethrough": False,
+                "underline": False,
+                "code": False,
+                "color": "default",
+            }
             text = {"content": content}
             if url and url != "Unknown":
                 text["link"] = {"url": url}
@@ -242,6 +250,9 @@ class NotionSyncService:
                 director = payload.get("director") or "Unknown"
                 editor = payload.get("editor") or "Unknown"
                 composer = payload.get("composer") or "Unknown"
+                director_note = payload.get("director_note")
+                editor_note = payload.get("editor_note")
+                composer_note = payload.get("composer_note")
                 imdb_link = payload.get("title_url")
                 source_name = payload.get("source_name") or "Unknown"
                 source_url = payload.get("source_url") or "Unknown"
@@ -250,25 +261,143 @@ class NotionSyncService:
                 editor_url = payload.get("editor_url")
                 composer_url = payload.get("composer_url")
                 producer_links = payload.get("producer_links") or []
-                rich_text = [text_part(title, url=imdb_link, bold=True), text_part("\n")]
-                rich_text.extend(line_parts("Country", country))
-                rich_text.extend(line_parts("Region", region))
-                rich_text.extend(line_parts("Budget", budget))
-                rich_text.extend(line_parts("Production Company", production_company, url=production_company_url))
-                rich_text.extend(line_parts("Director", director, url=director_url))
-                rich_text.extend(line_parts("Editor", editor, url=editor_url))
-                rich_text.extend(line_parts("Composer", composer, url=composer_url))
-                rich_text.extend(producer_parts(producer_links))
-                rich_text.extend(line_parts("Status", status))
-                rich_text.extend(line_parts("IMDb", imdb_link or "Unknown", url=imdb_link))
-                rich_text.extend(line_parts("Source", source_name, url=source_url))
+                producer_notes = payload.get("producer_notes") or {}
+                opportunity_score = payload.get("opportunity_score") or 0
+                why_this_matters = payload.get("why_this_matters") or "Needs manual review."
+                recent_sources = payload.get("recent_sources") or []
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "heading_3",
+                        "heading_3": {"rich_text": [text_part(title, url=imdb_link, bold=True)]},
+                    }
+                )
                 children.append(
                     {
                         "object": "block",
                         "type": "bulleted_list_item",
-                        "bulleted_list_item": {"rich_text": rich_text[:100]},
+                        "bulleted_list_item": {"rich_text": line_parts("Budget", budget)[:-1]},
                     }
                 )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": line_parts("Country", country)[:-1]},
+                    }
+                )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": line_parts("Region", region)[:-1]},
+                    }
+                )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": line_parts("Production Company", production_company, url=production_company_url)[:-1]},
+                    }
+                )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": (line_parts("Director", director, url=director_url)[:-1] + ([text_part(f" {director_note}")] if director_note else []))},
+                    }
+                )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": (line_parts("Editor", editor, url=editor_url)[:-1] + ([text_part(f" {editor_note}")] if editor_note else []))},
+                    }
+                )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": (line_parts("Composer", composer, url=composer_url)[:-1] + ([text_part(f" {composer_note}")] if composer_note else []))},
+                    }
+                )
+                producer_children = []
+                if producer_links:
+                    for producer in producer_links:
+                        producer_name = producer.get("name") or "Unknown"
+                        producer_line = [text_part(producer_name, url=producer.get("url"))]
+                        if producer_notes.get(producer_name):
+                            producer_line.append(text_part(f" {producer_notes[producer_name]}"))
+                        producer_children.append(
+                            {
+                                "object": "block",
+                                "type": "bulleted_list_item",
+                                "bulleted_list_item": {"rich_text": producer_line},
+                            }
+                        )
+                else:
+                    producer_children.append(
+                        {
+                            "object": "block",
+                            "type": "bulleted_list_item",
+                            "bulleted_list_item": {"rich_text": [text_part("Unknown")]},
+                        }
+                    )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": [text_part("Producers", bold=True)]},
+                        "children": producer_children[:10],
+                    }
+                )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": line_parts("Status", status)[:-1]},
+                    }
+                )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": line_parts("Opportunity Score", str(opportunity_score))[:-1]},
+                    }
+                )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": line_parts("Why this matters", why_this_matters)[:-1]},
+                    }
+                )
+                source_children = []
+                for source in recent_sources:
+                    source_children.append(
+                        {
+                            "object": "block",
+                            "type": "bulleted_list_item",
+                            "bulleted_list_item": {"rich_text": [text_part(source.get("name") or "Unknown", url=source.get("url"))]},
+                        }
+                    )
+                if not source_children:
+                    source_children.append(
+                        {
+                            "object": "block",
+                            "type": "bulleted_list_item",
+                            "bulleted_list_item": {"rich_text": [text_part("No recent sources attached yet.")]},
+                        }
+                    )
+                children.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": [text_part("Recent Press / Sources", bold=True)]},
+                        "children": source_children[:10],
+                    }
+                )
+                children.append({"object": "block", "type": "divider", "divider": {}})
 
         response = self.client.pages.create(
             parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
