@@ -112,18 +112,37 @@ class NotionSyncService:
                 )
 
     def _clear_existing_film_pages(self) -> None:
-        next_cursor: str | None = None
-        while True:
-            payload = {"data_source_id": self.films_database_id, "page_size": 100}
-            if next_cursor:
-                payload["start_cursor"] = next_cursor
-            response = self.client.data_sources.query(**payload)
-            results = response.get("results", [])
-            for page in results:
-                self.client.pages.update(page_id=page["id"], archived=True)
-            if not response.get("has_more"):
-                break
-            next_cursor = response.get("next_cursor")
+        archived_ids: set[str] = set()
+
+        def archive_from_query(method: str, identifier_key: str, identifier_value: str) -> None:
+            next_cursor: str | None = None
+            while True:
+                payload = {identifier_key: identifier_value, "page_size": 100}
+                if next_cursor:
+                    payload["start_cursor"] = next_cursor
+                response = getattr(self.client, method).query(**payload)
+                results = response.get("results", [])
+                for page in results:
+                    page_id = page["id"]
+                    if page_id in archived_ids:
+                        continue
+                    self.client.pages.update(page_id=page_id, archived=True)
+                    archived_ids.add(page_id)
+                if not response.get("has_more"):
+                    break
+                next_cursor = response.get("next_cursor")
+
+        archive_from_query("data_sources", "data_source_id", self.films_database_id)
+
+        try:
+            data_source = self.client.data_sources.retrieve(data_source_id=self.films_database_id)
+            parent = data_source.get("parent", {})
+            parent_database_id = parent.get("database_id") if parent.get("type") == "database_id" else None
+        except Exception:
+            parent_database_id = None
+
+        if parent_database_id:
+            archive_from_query("databases", "database_id", parent_database_id)
 
     def create_report_page(self, report_id: str) -> str | None:
         if not self.settings.notion_parent_page_id:
