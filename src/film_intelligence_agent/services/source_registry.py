@@ -7,6 +7,8 @@ import yaml
 
 from film_intelligence_agent.parsers.sources.cmf import CMFParser
 from film_intelligence_agent.parsers.sources.creative_bc import CreativeBCParser
+from film_intelligence_agent.parsers.sources.nfb import NFBNewsParser
+from film_intelligence_agent.parsers.sources.ontario_creates import OntarioCreatesParser
 from film_intelligence_agent.parsers.sources.playback import PlaybackParser
 from film_intelligence_agent.parsers.sources.telefilm import TelefilmParser
 
@@ -23,9 +25,9 @@ class SourceDefinition:
 
 PARSER_MAP = {
     "html_directory": TelefilmParser,
-    "program_page_plus_news": TelefilmParser,
+    "program_page_plus_news": OntarioCreatesParser,
     "searchable_database": CMFParser,
-    "news_release": PlaybackParser,
+    "news_release": NFBNewsParser,
     "html_list": CreativeBCParser,
     "article_feed": PlaybackParser,
 }
