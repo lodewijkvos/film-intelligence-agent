@@ -6,17 +6,25 @@ from bs4 import BeautifulSoup
 
 from film_intelligence_agent.domain.types import ExtractedFilm
 from film_intelligence_agent.parsers.base import SourceParser
-from film_intelligence_agent.utils.quality import is_probable_project_title
+from film_intelligence_agent.parsers.sources.common import clean_candidate_title
 
 
 class TelefilmParser(SourceParser):
     def parse(self, html: str, source_meta: dict) -> list[ExtractedFilm]:
         soup = BeautifulSoup(html, "lxml")
         films: list[ExtractedFilm] = []
-        for heading in soup.select("h2, h3"):
-            title = heading.get_text(" ", strip=True)
-            if not is_probable_project_title(title):
+        seen_titles: set[str] = set()
+        for row in soup.select("table tr"):
+            cells = row.select("td")
+            if len(cells) < 2:
                 continue
+            title = clean_candidate_title(cells[0].get_text(" ", strip=True))
+            if not title:
+                continue
+            normalized = title.lower()
+            if normalized in seen_titles:
+                continue
+            seen_titles.add(normalized)
             films.append(
                 ExtractedFilm(
                     title=title,
@@ -30,7 +38,7 @@ class TelefilmParser(SourceParser):
                     country="Canada",
                     region="Canada",
                     budget_text="Unknown",
-                    notes="Extracted from Telefilm heading structure.",
+                    notes="Extracted from structured official funding table.",
                 )
             )
         return films

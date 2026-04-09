@@ -6,20 +6,25 @@ from bs4 import BeautifulSoup
 
 from film_intelligence_agent.domain.types import ExtractedFilm
 from film_intelligence_agent.parsers.base import SourceParser
-from film_intelligence_agent.utils.quality import is_probable_project_title
+from film_intelligence_agent.parsers.sources.common import extract_title_from_container, has_project_signal
 
 
 class PlaybackParser(SourceParser):
     def parse(self, html: str, source_meta: dict) -> list[ExtractedFilm]:
         soup = BeautifulSoup(html, "lxml")
         items: list[ExtractedFilm] = []
+        seen_titles: set[str] = set()
         for article in soup.select("article"):
-            heading = article.select_one("h2, h3")
-            if not heading:
+            title = extract_title_from_container(article, ("h1", "h2", "h3"))
+            if not title:
                 continue
-            title = heading.get_text(" ", strip=True)
-            if not is_probable_project_title(title):
+            context_text = article.get_text(" ", strip=True)
+            if not has_project_signal(context_text):
                 continue
+            normalized = title.lower()
+            if normalized in seen_titles:
+                continue
+            seen_titles.add(normalized)
             items.append(
                 ExtractedFilm(
                     title=title,
@@ -33,7 +38,7 @@ class PlaybackParser(SourceParser):
                     country="Canada",
                     region="Canada",
                     budget_text="Unknown",
-                    notes="Trade candidate requiring downstream filtering.",
+                    notes="Trade candidate with explicit project signal in article summary.",
                 )
             )
         return items
