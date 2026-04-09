@@ -17,9 +17,8 @@ POSSESSIVE_TITLE_PATTERN = re.compile(
     r"([A-Z][A-Za-zÀ-ÿ0-9'’:-]+(?:\s+[A-Z][A-Za-zÀ-ÿ0-9'’:-]+){0,6})"
 )
 DESCRIPTOR_TITLE_PATTERN = re.compile(
-    r"(?:feature documentary|documentary|short film|feature film|series)\s+"
+    r"(?i:(?:feature documentary|documentary|short film|feature film|series))\s+"
     r"([A-Z][^.:;]+?)(?=\s(?:premiere|premieres|selected|playing|goes|wins|is|at|for|to)\b|[.:])",
-    re.IGNORECASE,
 )
 SLUG_STOP_MARKERS = (
     "-at-",
@@ -34,6 +33,12 @@ SLUG_STOP_MARKERS = (
     "-goes-",
 )
 SLUG_PREFIX_BLACKLIST = ("nfb-", "cynthia-", "board-", "canada-")
+TITLE_FRAGMENT_BLACKLIST = (
+    "from oscar nominated director",
+    "for their national film board of canada",
+    "national film board of canada",
+)
+TITLE_PREFIX_BLACKLIST = ("from ", "for ", "their ", "new ", "part ")
 
 
 class NFBNewsParser(SourceParser):
@@ -83,12 +88,15 @@ class NFBNewsParser(SourceParser):
             candidate = clean_candidate_title(match)
             if is_probable_project_title(candidate):
                 candidates.append(candidate)
-        for match in DESCRIPTOR_TITLE_PATTERN.findall(f"{headline}. {context_text}"):
-            candidate = clean_candidate_title(match)
-            if is_probable_project_title(candidate):
-                candidates.append(candidate)
+        if not slug_title:
+            for match in DESCRIPTOR_TITLE_PATTERN.findall(f"{headline}. {context_text}"):
+                candidate = clean_candidate_title(match)
+                if self._is_usable_extracted_title(candidate):
+                    candidates.append(candidate)
         if is_probable_project_title(headline) and len(headline.split()) <= 8:
-            candidates.append(clean_candidate_title(headline))
+            candidate = clean_candidate_title(headline)
+            if self._is_usable_extracted_title(candidate):
+                candidates.append(candidate)
         deduped: list[str] = []
         seen: set[str] = set()
         for candidate in candidates:
@@ -108,10 +116,21 @@ class NFBNewsParser(SourceParser):
             if marker in slug:
                 slug = slug.split(marker, 1)[0]
                 break
-        candidate = clean_candidate_title(slug.replace("-", " ").title())
-        if is_probable_project_title(candidate):
+        candidate = clean_candidate_title(slug.replace("-", " ").title()).replace("(Nfb)", "").strip()
+        if self._is_usable_extracted_title(candidate):
             return candidate
         return None
+
+    def _is_usable_extracted_title(self, candidate: str) -> bool:
+        cleaned = clean_candidate_title(candidate).replace("(NFB)", "").strip(" .:-")
+        lowered = cleaned.lower()
+        if any(lowered.startswith(prefix) for prefix in TITLE_PREFIX_BLACKLIST):
+            return False
+        if any(fragment in lowered for fragment in TITLE_FRAGMENT_BLACKLIST):
+            return False
+        if len(cleaned.split()) == 1 and "'" in cleaned:
+            return False
+        return is_probable_project_title(cleaned)
 
     def _infer_project_type(self, text: str) -> str | None:
         lowered = text.lower()

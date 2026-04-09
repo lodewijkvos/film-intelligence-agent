@@ -160,3 +160,22 @@ def test_nfb_news_parser_extracts_titles_from_press_release_cards() -> None:
     titles = [film.title for film in films]
     assert "Saigon Story" in titles
     assert "There Are No Words" in titles
+
+
+def test_nfb_news_parser_rejects_narrative_fragments_from_descriptor_text() -> None:
+    html = """
+    <html>
+      <body>
+        <div class="gw-gopf-col-wrap">
+          <div class="gw-gopf-post-title">
+            <h2><a href="https://mediaspace.nfb.ca/comm/saigon-story-at-hot-docs-2026/">World Premiere of Kim Nguyen’s Saigon Story: Two Shootings in the Forest Kingdom at Hot Docs 2026.</a></h2>
+          </div>
+          <div class="gw-gopf-post-excerpt">March 24, 2026 – Montreal – National Film Board of Canada (NFB) New feature documentary from Oscar-nominated director is part history, part mystery.</div>
+        </div>
+      </body>
+    </html>
+    """
+    films = NFBNewsParser().parse(html, SOURCE_META)
+    titles = [film.title for film in films]
+    assert "Saigon Story" in titles
+    assert "from Oscar-nominated director" not in titles
