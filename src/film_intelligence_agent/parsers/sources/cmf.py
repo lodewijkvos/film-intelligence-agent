@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from film_intelligence_agent.domain.types import ExtractedFilm
 from film_intelligence_agent.parsers.base import SourceParser
+from film_intelligence_agent.utils.quality import is_probable_project_title
 
 
 class CMFParser(SourceParser):
@@ -13,12 +14,12 @@ class CMFParser(SourceParser):
         soup = BeautifulSoup(html, "lxml")
         items: list[ExtractedFilm] = []
         for card in soup.select("article, .card, .views-row"):
-            title = card.get_text(" ", strip=True)
-            if len(title) < 3:
+            title = card.get_text(" ", strip=True).split("  ")[0].strip()
+            if not is_probable_project_title(title):
                 continue
             items.append(
                 ExtractedFilm(
-                    title=title.split("  ")[0],
+                    title=title,
                     source_name=source_meta["name"],
                     source_url=source_meta["url"],
                     source_tier=source_meta["tier"],

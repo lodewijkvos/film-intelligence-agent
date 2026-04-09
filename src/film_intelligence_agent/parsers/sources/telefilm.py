@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from film_intelligence_agent.domain.types import ExtractedFilm
 from film_intelligence_agent.parsers.base import SourceParser
+from film_intelligence_agent.utils.quality import is_probable_project_title
 
 
 class TelefilmParser(SourceParser):
@@ -14,7 +15,7 @@ class TelefilmParser(SourceParser):
         films: list[ExtractedFilm] = []
         for heading in soup.select("h2, h3"):
             title = heading.get_text(" ", strip=True)
-            if len(title) < 3:
+            if not is_probable_project_title(title):
                 continue
             films.append(
                 ExtractedFilm(
