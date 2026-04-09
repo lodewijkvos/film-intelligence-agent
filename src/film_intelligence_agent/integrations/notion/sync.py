@@ -34,8 +34,8 @@ class NotionSyncService:
         if not self.films_database_id:
             logger.info("Notion film sync skipped: no films database id configured")
             return
-        database = self.client.databases.retrieve(database_id=self.films_database_id)
-        properties = database.get("properties", {}) or {}
+        data_source = self.client.data_sources.retrieve(data_source_id=self.films_database_id)
+        properties = data_source.get("properties", {}) or {}
         logger.info("Notion film database properties: %s", list(properties.keys()))
         title_property = next((name for name, meta in properties.items() if meta.get("type") == "title"), None)
         status_property = "Status" if "Status" in properties else None
@@ -51,8 +51,8 @@ class NotionSyncService:
             films = list(session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit)))
         synced_count = 0
         for film in films:
-            existing = self.client.databases.query(
-                database_id=self.films_database_id,
+            existing = self.client.data_sources.query(
+                data_source_id=self.films_database_id,
                 filter={
                     "property": title_property,
                     "title": {"equals": film.title[:200]},
@@ -82,10 +82,7 @@ class NotionSyncService:
                 }
             if source_url_property:
                 notion_properties[source_url_property] = {"url": film.source_url}
-            self.client.pages.create(
-                parent={"database_id": self.films_database_id},
-                properties=notion_properties,
-            )
+            self.client.pages.create(parent={"data_source_id": self.films_database_id}, properties=notion_properties)
             synced_count += 1
         logger.info(
             "Notion film sync complete: database_id=%s synced_count=%s candidate_count=%s",

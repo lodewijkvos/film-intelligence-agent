@@ -57,23 +57,36 @@ class NotionSetupService:
         return resolved
 
     def _ensure_database(self, preferred_id: str | None, title: str, properties: dict) -> str:
-        if preferred_id and self._is_valid_database(preferred_id):
-            return preferred_id
+        resolved_existing_id = self._resolve_usable_data_source_id(preferred_id) if preferred_id else None
+        if resolved_existing_id:
+            return resolved_existing_id
         if preferred_id:
             logger.warning("Stored Notion database id %s for %s is invalid; creating a fresh database", preferred_id, title)
         response = self.client.databases.create(
             parent={"type": "page_id", "page_id": self.settings.notion_parent_page_id},
             title=[{"type": "text", "text": {"content": title}}],
-            properties=properties,
+            initial_data_source={"properties": properties},
         )
-        return response["id"]
+        return self._extract_data_source_id(response) or response["id"]
 
-    def _is_valid_database(self, database_id: str) -> bool:
+    def _resolve_usable_data_source_id(self, object_id: str | None) -> str | None:
+        if not object_id:
+            return None
         try:
-            database = self.client.databases.retrieve(database_id=database_id)
+            data_source = self.client.data_sources.retrieve(data_source_id=object_id)
+            properties = data_source.get("properties", {}) or {}
+            if isinstance(properties, dict) and any(meta.get("type") == "title" for meta in properties.values()):
+                return object_id
         except Exception:
-            return False
-        properties = database.get("properties", {}) or {}
-        if not isinstance(properties, dict) or not properties:
-            return False
-        return any(meta.get("type") == "title" for meta in properties.values())
+            pass
+        try:
+            database = self.client.databases.retrieve(database_id=object_id)
+        except Exception:
+            return None
+        return self._extract_data_source_id(database)
+
+    def _extract_data_source_id(self, response: dict) -> str | None:
+        data_sources = response.get("data_sources", []) or []
+        if data_sources:
+            return data_sources[0].get("id")
+        return None
