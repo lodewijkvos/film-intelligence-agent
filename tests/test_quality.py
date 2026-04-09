@@ -11,6 +11,7 @@ def test_project_title_filter_rejects_navigation_labels() -> None:
     assert not is_probable_project_title("LinkedIn")
     assert not is_probable_project_title("Instagram")
     assert not is_probable_project_title("Production Services Tax Credit")
+    assert not is_probable_project_title("Tax Credit Updates")
 
 
 def test_project_title_filter_accepts_normal_project_titles() -> None:

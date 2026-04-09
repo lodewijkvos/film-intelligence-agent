@@ -72,6 +72,7 @@ NOISE_TITLE_FRAGMENTS = (
     "studio facilities",
     "studio zones",
     "talent + labour",
+    "tax credit updates",
     "application process",
 )
 
@@ -90,6 +91,7 @@ def is_probable_project_title(title: str) -> bool:
         "instagram",
         "facebook",
         "spotify",
+        "tax credit updates",
         "logos",
         "reports",
         "overview",

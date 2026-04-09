@@ -10,6 +10,7 @@ from film_intelligence_agent.db.models import Film, WeeklyReport
 from film_intelligence_agent.db.session import db_session
 from film_intelligence_agent.integrations.notion.client import get_notion_client
 from film_intelligence_agent.services.config_store import ConfigStore
+from film_intelligence_agent.utils.normalize import normalize_title
 from film_intelligence_agent.utils.quality import is_probable_project_title, is_probable_project_title_normalized
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,8 @@ class NotionSyncService:
             films = [
                 film
                 for film in session.scalars(select(Film).order_by(desc(Film.last_seen_at)).limit(limit * 5))
-                if is_probable_project_title(film.title) and is_probable_project_title_normalized(film.title)
+                if is_probable_project_title(film.title)
+                and is_probable_project_title_normalized(normalize_title(film.title))
             ][:limit]
         self._clear_existing_film_pages()
         synced_count = 0
